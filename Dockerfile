@@ -1,20 +1,20 @@
-# STUFE 1: Bauen (Build) mit vorinstalliertem Maven
-# Wir nutzen ein Image, das Maven schon hat. Das löst das "mvnw"-Problem.
-FROM maven:3.9.6-eclipse-temurin-17 AS build
+# STUFE 1: Bauen (Build)
+# WICHTIG: Wir nutzen jetzt das Image für Java 21
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
 # Kopiere alles ins Image
 COPY . .
 
-# Bauen (nutzt das globale 'mvn' statt './mvnw')
+# Bauen
 RUN mvn clean package -DskipTests
 
 # STUFE 2: Ausführen (Run)
-FROM eclipse-temurin:17-jre-alpine
+# Auch hier brauchen wir die Laufzeitumgebung für Java 21
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 # Wir holen uns die fertige .jar Datei aus Stufe 1
-# Der Name der JAR kann variieren, wir nehmen einfach die erste, die wir finden
 COPY --from=build /app/target/*.jar app.jar
 
 # Port 8080 freigeben
