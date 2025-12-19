@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ShoeForm from './components/ShoeForm';
-import HistoryModal from './components/HistoryModal'; // <--- NEU IMPORTIERT
+import HistoryModal from './components/HistoryModal';
 import API_URL from './config';
 
 const SHOE_TYPES = [
@@ -27,8 +27,8 @@ function App() {
   const [bulkProduction, setBulkProduction] = useState('');
   const [bulkDate, setBulkDate] = useState('');
 
-  // --- NEU: HISTORIE STATE ---
-  const [historyShoe, setHistoryShoe] = useState(null); // Speichert den Schuh, dessen Verlauf wir sehen wollen
+  // --- HISTORIE STATE ---
+  const [historyShoe, setHistoryShoe] = useState(null);
 
   const auth = { username: 'schuhfee', password: 'theater123' };
 
@@ -102,13 +102,13 @@ function App() {
   const selectAllFiltered = () => setSelectedIds(filteredShoes.map(s => s.id));
   const clearSelection = () => setSelectedIds([]);
 
-  // --- FILTER LOGIK ---
+  // --- FILTER LOGIK (Jetzt mit Regalnummer!) ---
   const filteredShoes = shoes.filter(shoe => {
     const lowerSearch = searchTerm.toLowerCase();
     const matchesSearch =
-      shoe.inventoryNumber.toLowerCase().includes(lowerSearch) ||
-      shoe.size.toLowerCase().includes(lowerSearch) ||
-      (shoe.currentProduction && shoe.currentProduction.toLowerCase().includes(lowerSearch));
+          (shoe.shelfLocation && shoe.shelfLocation.toLowerCase().includes(lowerSearch)) || // Suche nach Regal!
+          shoe.size.toLowerCase().includes(lowerSearch) ||
+          (shoe.currentProduction && shoe.currentProduction.toLowerCase().includes(lowerSearch));
 
     const matchesType = filterType === 'Alle' || shoe.type === filterType;
     const matchesStatus = filterStatus === 'Alle' || shoe.status === filterStatus;
@@ -191,7 +191,7 @@ function App() {
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end sticky top-2 z-30">
             <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Suche</label>
-                <input type="text" placeholder="🔍 Nr, Größe oder Produktion..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
+                <input type="text" placeholder="🔍 Regal, Größe oder Produktion..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kategorie</label>
@@ -221,9 +221,9 @@ function App() {
                       </div>
                   </div>
 
-                  {/* Inv Nummer */}
-                  <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur text-gray-600 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded shadow-sm">
-                    {shoe.inventoryNumber}
+                  {/* --- NEU: REGALNUMMER OBEN RECHTS (FETT) --- */}
+                  <div className="absolute top-2 right-2 z-10 bg-gray-900/80 backdrop-blur text-white text-xs font-bold uppercase px-2 py-1 rounded shadow-sm border border-white/20">
+                    📍 {shoe.shelfLocation || "???"}
                   </div>
 
                   {/* Bild */}
@@ -255,24 +255,24 @@ function App() {
 
                    {/* --- BUTTONS SIND JETZT IMMER SICHTBAR --- */}
                     <div className="mt-3 pt-2 border-t border-gray-100 flex justify-between items-center">
-                                            {/* Verlauf Button */}
-                                           <button
-                                               onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }}
-                                               className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1.5 rounded font-bold flex items-center gap-1 transition-colors"
-                                               title="Verlauf anzeigen"
-                                           >
-                                               📜 Verlauf
-                                           </button>
+                         {/* Verlauf Button */}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }}
+                            className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1.5 rounded font-bold flex items-center gap-1 transition-colors"
+                            title="Verlauf anzeigen"
+                        >
+                            📜 Verlauf
+                        </button>
 
-                                           {/* Löschen Button (ganz dezent in grau) */}
-                                           <button
-                                               onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }}
-                                               className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
-                                               title="Löschen"
-                                           >
-                                               🗑
-                                           </button>
-                                       </div>
+                        {/* Löschen Button (ganz dezent in grau) */}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }}
+                            className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                            title="Löschen"
+                        >
+                            🗑
+                        </button>
+                    </div>
 
                   </div>
                 </div>

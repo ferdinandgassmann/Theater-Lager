@@ -1,148 +1,114 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import API_URL from '../config'; // WICHTIG: Config importieren
+import API_URL from '../config';
 
 function ShoeForm({ onShoeAdded, shoeTypes }) {
   const [formData, setFormData] = useState({
-    inventoryNumber: '',
-    type: shoeTypes[0],
+    shelfLocation: '', // Früher inventoryNumber
+    type: 'Sonstiges',
     size: '',
-    status: 'Verfügbar'
+    image: null
   });
-
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const auth = { username: 'schuhfee', password: 'theater123' };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+    // 1. Erst den Schuh datensatz anlegen
+    try {
+      // Wir senden shelfLocation an das Backend
+      // inventoryNumber lassen wir automatisch generieren oder leer
+      const shoePayload = {
+        shelfLocation: formData.shelfLocation,
+        inventoryNumber: "AUTO-" + Date.now().toString().slice(-4), // Fake ID für interne Zwecke
+        type: formData.type,
+        size: formData.size,
+        status: 'Verfügbar'
+      };
+
+      const res = await axios.post(`${API_URL}/api/shoes`, shoePayload, { auth });
+      const newShoeId = res.data.id;
+
+      // 2. Bild hochladen (falls vorhanden)
+      if (formData.image) {
+        const imagePayload = new FormData();
+        imagePayload.append('file', formData.image);
+        await axios.post(`${API_URL}/api/shoes/${newShoeId}/image`, imagePayload, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            auth
+        });
+      }
+
+      // Alles fertig
+      onShoeAdded({ ...res.data, shelfLocation: formData.shelfLocation });
+      setFormData({ shelfLocation: '', type: 'Sonstiges', size: '', image: null });
+      setLoading(false);
+    } catch (err) {
+      alert('Fehler beim Speichern: ' + err.message);
+      setLoading(false);
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
-
-    // SCHRITT 1: Schuh Daten anlegen (Nutzt API_URL)
-    axios.post(`${API_URL}/api/shoes`, formData, { auth })
-      .then(async (response) => {
-        const newShoe = response.data;
-
-        // SCHRITT 2: Wenn ein Bild da ist, Bild hochladen
-        if (selectedFile) {
-            const imageFormData = new FormData();
-            imageFormData.append('file', selectedFile);
-
-            try {
-                // KORREKTUR: Hier fehlte die saubere Template String Syntax
-                await axios.post(`${API_URL}/api/shoes/${newShoe.id}/image`, imageFormData, {
-                    auth,
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-                console.log("Bild hochgeladen");
-            } catch (uploadError) {
-                console.error("Bild Upload fehlgeschlagen", uploadError);
-                alert("Schuh wurde gespeichert, aber das Bild konnte nicht hochgeladen werden.");
-            }
-        }
-
-        // Fertig!
-        onShoeAdded(newShoe);
-
-        // Reset
-        setFormData({ inventoryNumber: '', type: shoeTypes[0], size: '', status: 'Verfügbar' });
-        setSelectedFile(null);
-        document.getElementById('fileInput').value = "";
-      })
-      .catch(err => {
-        console.error(err);
-        setError('Fehler beim Speichern.');
-      })
-      .finally(() => {
-        setIsSubmitting(false);
-      });
-  };
-
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md mb-8 border-l-4 border-blue-500 animate-fade-in-down">
-      <h3 className="text-xl font-bold mb-4 text-gray-800">Neuen Schuh anlegen 👞</h3>
+    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-8 animate-fade-in-down">
+      <h2 className="text-xl font-bold text-gray-800 mb-4">Neuen Schuh in Kiste legen</h2>
 
-      {error && <div className="text-red-600 mb-3 text-sm">{error}</div>}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* --- ÄNDERUNG: REGAL STATT INVENTARNUMMER --- */}
+        <div>
+          <label className="block text-sm font-bold text-gray-600 mb-1">Regal / Kiste</label>
+          <input
+            type="text"
+            required
+            placeholder="z.B. A-01"
+            value={formData.shelfLocation}
+            onChange={e => setFormData({...formData, shelfLocation: e.target.value})}
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none uppercase font-bold"
+          />
+        </div>
 
-          {/* Inventarnummer */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Inventarnummer</label>
-            <input type="text" name="inventoryNumber" value={formData.inventoryNumber} onChange={handleChange} placeholder="z.B. 1001" required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
-          </div>
+        <div>
+          <label className="block text-sm font-bold text-gray-600 mb-1">Typ</label>
+          <select
+            value={formData.type}
+            onChange={e => setFormData({...formData, type: e.target.value})}
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            {shoeTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
 
-          {/* Schuhart */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Schuhart</label>
-            <select name="type" value={formData.type} onChange={handleChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border bg-white">
-              {shoeTypes.map(type => <option key={type} value={type}>{type}</option>)}
-            </select>
-          </div>
+        <div>
+          <label className="block text-sm font-bold text-gray-600 mb-1">Größe</label>
+          <input
+            type="text"
+            required
+            placeholder="z.B. 42"
+            value={formData.size}
+            onChange={e => setFormData({...formData, size: e.target.value})}
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
 
-          {/* Größe */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Größe</label>
-            <input type="text" name="size" value={formData.size} onChange={handleChange} placeholder="z.B. 42" required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Status</label>
-            <select name="status" value={formData.status} onChange={handleChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border bg-white">
-              <option value="Verfügbar">Verfügbar</option>
-              <option value="Ausgeliehen">Ausgeliehen</option>
-              <option value="In Reparatur">In Reparatur</option>
-              <option value="Ausgemustert">Ausgemustert</option>
-            </select>
-          </div>
-
-          {/* FOTO UPLOAD */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Foto (Optional)</label>
+        <div>
+            <label className="block text-sm font-bold text-gray-600 mb-1">Foto (Optional)</label>
             <input
-                id="fileInput"
                 type="file"
                 accept="image/*"
-                onChange={handleFileChange}
-                className="mt-1 block w-full text-sm text-gray-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-full file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-blue-50 file:text-blue-700
-                  hover:file:bg-blue-100 cursor-pointer border rounded-md"
+                onChange={e => setFormData({...formData, image: e.target.files[0]})}
+                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
-          </div>
-
         </div>
+      </div>
 
-        <div className="flex justify-end pt-2">
-            <button type="submit" disabled={isSubmitting}
-            className="bg-blue-600 text-white font-bold py-2 px-6 rounded hover:bg-blue-700 transition disabled:bg-gray-400">
-            {isSubmitting ? 'Speichere...' : 'Speichern & Hochladen'}
-            </button>
-        </div>
-      </form>
-    </div>
+      <button type="submit" disabled={loading} className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition shadow-lg flex justify-center">
+        {loading ? 'Speichere...' : 'In den Fundus aufnehmen'}
+      </button>
+    </form>
   );
 }
 
