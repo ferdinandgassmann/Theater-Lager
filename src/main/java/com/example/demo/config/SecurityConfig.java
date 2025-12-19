@@ -10,6 +10,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpMethod;
 
 import java.util.Arrays;
 import java.util.List;
@@ -21,18 +22,17 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. CSRF deaktivieren (wichtig für API-Zugriffe von React)
                 .csrf(AbstractHttpConfigurer::disable)
-
-                // 2. CORS konfigurieren (damit localhost:3000 zugreifen darf)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // 3. Alle Anfragen müssen authentifiziert sein
                 .authorizeHttpRequests(auth -> auth
+                        // 1. NEU: Bilder darf JEDER sehen (damit das <img> Tag im Browser funktioniert)
+                        .requestMatchers(HttpMethod.GET, "/api/shoes/*/image").permitAll()
+
+                        // 2. Alle anderen Anfragen brauchen weiterhin Passwort
                         .anyRequest().authenticated()
                 )
 
-                // 4. HTTP Basic Auth aktivieren (für unseren einfachen Login)
                 .httpBasic(Customizer.withDefaults());
 
         return http.build();
@@ -41,13 +41,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Erlaube Zugriff vom Frontend
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
-        // Erlaube alle Methoden (GET, POST, DELETE, etc.)
+
+        // Wir erlauben Localhost UND eine URL, die wir später in der Cloud festlegen
+        String frontendUrl = System.getenv("FRONTEND_URL");
+        if (frontendUrl != null) {
+            configuration.setAllowedOrigins(List.of("http://localhost:3000", frontendUrl));
+        } else {
+            configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        }
+
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        // Erlaube alle Header (z.B. Authorization für das Passwort)
         configuration.setAllowedHeaders(List.of("*"));
-        // Erlaube Credentials (Benutzername/Passwort)
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
