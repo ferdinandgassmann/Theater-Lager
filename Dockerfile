@@ -1,23 +1,20 @@
-# STUFE 1: Bauen (Build)
-# Wir nutzen ein Image mit Java 17 und Maven
-FROM eclipse-temurin:17-jdk-alpine AS build
+# STUFE 1: Bauen (Build) mit vorinstalliertem Maven
+# Wir nutzen ein Image, das Maven schon hat. Das löst das "mvnw"-Problem.
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Wir kopieren erst nur die Projekt-Dateien
+# Kopiere alles ins Image
 COPY . .
 
-# Wir geben dem Maven-Wrapper Ausführrechte (wichtig für Linux/Cloud)
-RUN chmod +x mvnw
-
-# Wir bauen das Projekt (und überspringen Tests, damit es schneller geht)
-RUN ./mvnw clean package -DskipTests
+# Bauen (nutzt das globale 'mvn' statt './mvnw')
+RUN mvn clean package -DskipTests
 
 # STUFE 2: Ausführen (Run)
-# Wir nehmen ein schlankes Image nur zum Ausführen
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Wir holen uns die fertige .jar Datei aus Stufe 1
+# Der Name der JAR kann variieren, wir nehmen einfach die erste, die wir finden
 COPY --from=build /app/target/*.jar app.jar
 
 # Port 8080 freigeben
