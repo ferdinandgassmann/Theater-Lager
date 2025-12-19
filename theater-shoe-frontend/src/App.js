@@ -156,17 +156,40 @@ function App() {
 
         {/* HEADER */}
         <div className="mb-8">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight cursor-pointer" onClick={() => setFilterStatus('Alle')}>
-                👞 Theater Schuh Lager
-                </h1>
-                <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow transition"
-                >
-                    {showForm ? 'Schließen' : '+ Schuh erfassen'}
-                </button>
-            </div>
+           {/* HEADER BEREICH */}
+                       <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+                           {/* LOGO & TITEL KOMBINATION */}
+                           <div
+                               className="flex items-center gap-6 cursor-pointer group select-none"
+                               onClick={() => setFilterStatus('Alle')}
+                           >
+                               {/* DAS LOGO: Jetzt riesig und ohne Rand */}
+                               <img
+                                   src="/logo.png"
+                                   alt="Shoe on a Shelf Logo"
+                                   // ÄNDERUNG HIER: w-32 h-32 (statt 16), border entfernt
+                                   className="w-32 h-32 rounded-2xl shadow-lg group-hover:scale-105 transition-transform bg-blue-50"
+                               />
+                               <div>
+                                   {/* Titel auch etwas größer gemacht */}
+                                   <h1 className="text-4xl md:text-5xl font-extrabold text-blue-800 tracking-tight leading-none">
+                                       Shoe on a Shelf
+                                   </h1>
+                                   <p className="text-sm text-blue-500 font-bold uppercase tracking-wider mt-2 pl-1">
+                                       Theater Schuh Lager
+                                   </p>
+                               </div>
+                           </div>
+
+                           {/* BUTTON */}
+                           <button
+                               onClick={() => setShowForm(!showForm)}
+                               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-3 text-lg"
+                           >
+                               <span>{showForm ? 'Schließen' : 'Neu erfassen'}</span>
+                               {!showForm && <span className="text-2xl leading-none pb-1">+</span>}
+                           </button>
+                       </div>
 
             {/* DASHBOARD KACHELN */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -255,13 +278,28 @@ function App() {
                           {isSelected && <span className="text-white font-bold text-xs">✓</span>}
                       </div>
                   </div>
-                  {/* Regalnummer */}
-                  <div className="absolute top-2 right-2 z-10 bg-gray-900/80 backdrop-blur text-white text-xs font-bold uppercase px-2 py-1 rounded shadow-sm border border-white/20">
-                    📍 {shoe.shelfLocation || "???"}
-                  </div>
-                  {/* Bild */}
-                  <div className="h-32 w-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                    <img src={imageUrl} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/400x300?text=No+Img"; }} />
+                  {/* Nur anzeigen, wenn shelfLocation existiert */}
+                  {shoe.shelfLocation && (
+                      <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur text-blue-900 text-[10px] font-bold uppercase px-2 py-1 rounded-lg shadow-sm border border-blue-100 flex items-center gap-1">
+                          <span>📍</span> {shoe.shelfLocation}
+                      </div>
+                  )}
+                  {/* BILD BEREICH */}
+                  <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
+                      {shoe.imageUpdate || shoe.hasImage ? (
+                           <img
+                              src={`${API_URL}/api/shoes/${shoe.id}/image...`} // (dein bestehender Code)
+                              alt={shoe.type}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                           />
+                      ) : null}
+
+                      {/* Fallback, wenn kein Bild da ist (oder Error auftritt) */}
+                      <div className={`flex flex-col items-center justify-center text-blue-300 ${shoe.imageUpdate || shoe.hasImage ? 'hidden' : 'flex'}`}>
+                          <span className="text-4xl">👞</span>
+                          <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
+                      </div>
                   </div>
                   <div className="p-3">
                     <h2 className="text-sm font-bold text-gray-800 truncate" title={shoe.type}>{shoe.type}</h2>
@@ -277,13 +315,32 @@ function App() {
                             <p className="text-xs font-bold text-gray-800 truncate" title={shoe.currentProduction}>🎭 {shoe.currentProduction}</p>
                         </div>
                     )}
-                    {/* Action Bar */}
-                    <div className="mt-3 pt-2 border-t border-gray-100 flex justify-between items-center gap-1">
-                        <div className="flex gap-1">
-                            <button onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }} className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1.5 rounded font-bold transition-colors" title="Verlauf">📜</button>
-                            <button onClick={(e) => { e.stopPropagation(); setEditingShoe(shoe); }} className="text-[10px] bg-amber-50 text-amber-600 hover:bg-amber-100 px-2 py-1.5 rounded font-bold transition-colors" title="Bearbeiten">✏️</button>
-                        </div>
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }} className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Löschen">🗑</button>
+                    {/* ACTION BAR - Clean & Right Aligned */}
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end items-center gap-2">
+
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }}
+                            className="h-8 w-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-full flex items-center justify-center transition shadow-sm"
+                            title="Verlauf"
+                        >
+                            <span className="text-sm">📜</span>
+                        </button>
+
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setEditingShoe(shoe); }}
+                            className="h-8 w-8 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-full flex items-center justify-center transition shadow-sm"
+                            title="Bearbeiten"
+                        >
+                            <span className="text-sm">✏️</span>
+                        </button>
+
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }}
+                            className="h-8 w-8 bg-gray-50 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded-full flex items-center justify-center transition shadow-sm ml-1"
+                            title="Löschen"
+                        >
+                            <span className="text-sm">🗑</span>
+                        </button>
                     </div>
                   </div>
                 </div>
