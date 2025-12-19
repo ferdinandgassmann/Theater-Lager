@@ -134,7 +134,7 @@ function App() {
         <div className="mb-8">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight cursor-pointer" onClick={() => setFilterStatus('Alle')}>
-                🎭 Theater Fundus
+                🎭 Theater Schuh Lager
                 </h1>
                 <button
                     onClick={() => setShowForm(!showForm)}
