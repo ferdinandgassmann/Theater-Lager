@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ShoeForm from './components/ShoeForm';
 import HistoryModal from './components/HistoryModal';
+import EditShoeModal from './components/EditShoeModal';
 import API_URL from './config';
 
 const SHOE_TYPES = [
@@ -27,8 +28,9 @@ function App() {
   const [bulkProduction, setBulkProduction] = useState('');
   const [bulkDate, setBulkDate] = useState('');
 
-  // --- HISTORIE STATE ---
+  // Modals
   const [historyShoe, setHistoryShoe] = useState(null);
+  const [editingShoe, setEditingShoe] = useState(null);
 
   const auth = { username: 'schuhfee', password: 'theater123' };
 
@@ -46,6 +48,11 @@ function App() {
     setShowForm(false);
   };
 
+  const handleShoeUpdated = (updatedShoe) => {
+    setShoes(prev => prev.map(s => s.id === updatedShoe.id ? updatedShoe : s));
+    setEditingShoe(null);
+  };
+
   const handleDelete = (id) => {
     if(!window.confirm("Schuh wirklich löschen?")) return;
     axios.delete(`${API_URL}/api/shoes/${id}`, { auth })
@@ -56,7 +63,37 @@ function App() {
       .catch(err => alert("Fehler: " + err));
   };
 
-  // --- STATISTIK BERECHNEN ---
+  // --- NEU: BACKUP / EXPORT FUNKTION ---
+  const handleExport = () => {
+    // CSV Header
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Regal/Kiste;Typ;Größe;Status;Aktuelle Produktion;Inventar-ID\n";
+
+    // Daten Zeilen
+    shoes.forEach(shoe => {
+        const row = [
+            shoe.shelfLocation || "",
+            shoe.type,
+            shoe.size,
+            shoe.status,
+            shoe.currentProduction || "",
+            shoe.inventoryNumber || ""
+        ].join(";"); // Semikolon Trennung für Excel (deutsch)
+        csvContent += row + "\n";
+    });
+
+    // Download auslösen
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    const date = new Date().toISOString().slice(0,10);
+    link.setAttribute("download", `Lager_Backup_${date}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // --- STATISTIK ---
   const stats = {
     total: shoes.length,
     available: shoes.filter(s => s.status === 'Verfügbar').length,
@@ -70,11 +107,8 @@ function App() {
   };
 
   const handleFilterClick = (status) => {
-    if (filterStatus === status) {
-        setFilterStatus('Alle');
-    } else {
-        setFilterStatus(status);
-    }
+    if (filterStatus === status) { setFilterStatus('Alle'); }
+    else { setFilterStatus(status); }
   };
 
   // --- BULK ACTIONS ---
@@ -102,11 +136,11 @@ function App() {
   const selectAllFiltered = () => setSelectedIds(filteredShoes.map(s => s.id));
   const clearSelection = () => setSelectedIds([]);
 
-  // --- FILTER LOGIK (Jetzt mit Regalnummer!) ---
+  // --- FILTER LOGIK ---
   const filteredShoes = shoes.filter(shoe => {
     const lowerSearch = searchTerm.toLowerCase();
     const matchesSearch =
-          (shoe.shelfLocation && shoe.shelfLocation.toLowerCase().includes(lowerSearch)) || // Suche nach Regal!
+          (shoe.shelfLocation && shoe.shelfLocation.toLowerCase().includes(lowerSearch)) ||
           shoe.size.toLowerCase().includes(lowerSearch) ||
           (shoe.currentProduction && shoe.currentProduction.toLowerCase().includes(lowerSearch));
 
@@ -117,20 +151,20 @@ function App() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32 font-sans text-gray-800 relative">
+    <div className="min-h-screen bg-gray-50 pb-40 font-sans text-gray-800 relative">
       <div className="max-w-7xl mx-auto p-4 md:p-8">
 
         {/* HEADER */}
         <div className="mb-8">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight cursor-pointer" onClick={() => setFilterStatus('Alle')}>
-                🎭 Theater Fundus
+                👞 Theater Schuh Lager
                 </h1>
                 <button
                     onClick={() => setShowForm(!showForm)}
                     className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow transition"
                 >
-                    {showForm ? 'Schließen' : '+ Neuer Schuh'}
+                    {showForm ? 'Schließen' : '+ Schuh erfassen'}
                 </button>
             </div>
 
@@ -211,83 +245,65 @@ function App() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredShoes.map(shoe => {
             const isSelected = selectedIds.includes(shoe.id);
+            const imageUrl = `${API_URL}/api/shoes/${shoe.id}/image` + (shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : '');
+
             return (
                 <div key={shoe.id} onClick={() => toggleSelection(shoe.id)} className={`relative bg-white rounded-xl shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden group ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50' : 'border-gray-100 hover:shadow-md'}`}>
-
                   {/* Select Icon */}
                   <div className={`absolute top-2 left-2 z-20 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300'}`}>
                           {isSelected && <span className="text-white font-bold text-xs">✓</span>}
                       </div>
                   </div>
-
-                  {/* --- NEU: REGALNUMMER OBEN RECHTS (FETT) --- */}
+                  {/* Regalnummer */}
                   <div className="absolute top-2 right-2 z-10 bg-gray-900/80 backdrop-blur text-white text-xs font-bold uppercase px-2 py-1 rounded shadow-sm border border-white/20">
                     📍 {shoe.shelfLocation || "???"}
                   </div>
-
                   {/* Bild */}
                   <div className="h-32 w-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                    <img
-                        src={`${API_URL}/api/shoes/${shoe.id}/image`}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/400x300?text=No+Img"; }}
-                    />
+                    <img src={imageUrl} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/400x300?text=No+Img"; }} />
                   </div>
-
                   <div className="p-3">
                     <h2 className="text-sm font-bold text-gray-800 truncate" title={shoe.type}>{shoe.type}</h2>
                     <p className="text-xs text-gray-500">Größe: <span className="font-bold text-gray-800">{shoe.size}</span></p>
-
                     <div className="mt-2 flex flex-wrap gap-1">
                         <span className={`text-[10px] px-1.5 py-0.5 rounded border ${shoe.status === 'Verfügbar' ? 'bg-green-50 text-green-700 border-green-200' : shoe.status === 'Ausgeliehen' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                             {shoe.status}
                         </span>
                     </div>
-
                     {shoe.status === 'Ausgeliehen' && shoe.currentProduction && (
                         <div className="mt-2 bg-yellow-50 p-1.5 rounded border border-yellow-100">
                             <p className="text-[10px] text-gray-500 uppercase font-bold">Im Stück:</p>
                             <p className="text-xs font-bold text-gray-800 truncate" title={shoe.currentProduction}>🎭 {shoe.currentProduction}</p>
                         </div>
                     )}
-
-                   {/* --- BUTTONS SIND JETZT IMMER SICHTBAR --- */}
-                    <div className="mt-3 pt-2 border-t border-gray-100 flex justify-between items-center">
-                         {/* Verlauf Button */}
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }}
-                            className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1.5 rounded font-bold flex items-center gap-1 transition-colors"
-                            title="Verlauf anzeigen"
-                        >
-                            📜 Verlauf
-                        </button>
-
-                        {/* Löschen Button (ganz dezent in grau) */}
-                        <button
-                            onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }}
-                            className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
-                            title="Löschen"
-                        >
-                            🗑
-                        </button>
+                    {/* Action Bar */}
+                    <div className="mt-3 pt-2 border-t border-gray-100 flex justify-between items-center gap-1">
+                        <div className="flex gap-1">
+                            <button onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }} className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1.5 rounded font-bold transition-colors" title="Verlauf">📜</button>
+                            <button onClick={(e) => { e.stopPropagation(); setEditingShoe(shoe); }} className="text-[10px] bg-amber-50 text-amber-600 hover:bg-amber-100 px-2 py-1.5 rounded font-bold transition-colors" title="Bearbeiten">✏️</button>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }} className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Löschen">🗑</button>
                     </div>
-
                   </div>
                 </div>
             );
           })}
         </div>
+
+        {/* --- NEU: FOOTER MIT BACKUP BUTTON --- */}
+        <div className="mt-12 text-center border-t border-gray-200 pt-8 pb-4">
+            <button onClick={handleExport} className="text-sm text-gray-500 hover:text-gray-800 flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded hover:bg-gray-100 transition">
+                📥 Datensicherung herunterladen (.csv)
+            </button>
+            <p className="text-[10px] text-gray-400 mt-2">© Theater Schuh Lager V1.0</p>
+        </div>
+
       </div>
 
-      {/* --- MODAL WIRD HIER ANGEZEIGT WENN NOTWENDIG --- */}
-      {historyShoe && (
-          <HistoryModal
-            shoe={historyShoe}
-            onClose={() => setHistoryShoe(null)}
-          />
-      )}
+      {/* --- MODALS --- */}
+      {historyShoe && <HistoryModal shoe={historyShoe} onClose={() => setHistoryShoe(null)} />}
+      {editingShoe && <EditShoeModal shoe={editingShoe} shoeTypes={SHOE_TYPES} onClose={() => setEditingShoe(null)} onUpdate={handleShoeUpdated} />}
 
       {/* BULK ACTION BAR */}
       {selectedIds.length > 0 && (

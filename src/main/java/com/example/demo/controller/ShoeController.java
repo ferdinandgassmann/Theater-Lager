@@ -73,6 +73,7 @@ public class ShoeController {
                 shoe.setCurrentProduction(shoeDetails.getCurrentProduction());
                 shoe.setReturnDate(shoeDetails.getReturnDate());
             }
+            shoe.setShelfLocation(shoeDetails.getShelfLocation());
 
             shoe.setInventoryNumber(shoeDetails.getInventoryNumber());
             shoe.setType(shoeDetails.getType());

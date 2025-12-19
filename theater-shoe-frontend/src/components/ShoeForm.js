@@ -54,8 +54,7 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-8 animate-fade-in-down">
-      <h2 className="text-xl font-bold text-gray-800 mb-4">Neuen Schuh in Kiste legen</h2>
-
+      <h2 className="text-xl font-bold text-gray-800 mb-4">Neuen Schuh im Lager erfassen</h2>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 
         {/* --- ÄNDERUNG: REGAL STATT INVENTARNUMMER --- */}
@@ -105,8 +104,8 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
         </div>
       </div>
 
-      <button type="submit" disabled={loading} className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition shadow-lg flex justify-center">
-        {loading ? 'Speichere...' : 'In den Fundus aufnehmen'}
+      <button type="submit" disabled={loading} className="...">
+          {loading ? 'Speichere...' : 'Im Lager speichern'}
       </button>
     </form>
   );
