@@ -1,152 +1,175 @@
 package com.example.demo.controller;
 
 import com.example.demo.model.Shoe;
+import com.example.demo.model.ShoeHistory;
 import com.example.demo.repository.ShoeRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.demo.repository.ShoeHistoryRepository;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
 
+import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/shoes")
 public class ShoeController {
 
-    @Autowired
-    private ShoeRepository shoeRepository;
+    private final ShoeRepository shoeRepository;
+    private final ShoeHistoryRepository historyRepository; // NEU
 
-    // 1. Alle holen
+    public ShoeController(ShoeRepository shoeRepository, ShoeHistoryRepository historyRepository) {
+        this.shoeRepository = shoeRepository;
+        this.historyRepository = historyRepository;
+    }
+
     @GetMapping
     public List<Shoe> getAllShoes() {
         return shoeRepository.findAll();
     }
 
-    // 2. Anlegen
     @PostMapping
     public Shoe createShoe(@RequestBody Shoe shoe) {
         return shoeRepository.save(shoe);
     }
 
-    // 3. Einzeln holen
     @GetMapping("/{id}")
-    public ResponseEntity<Shoe> getShoeById(@PathVariable Long id) {
-        Optional<Shoe> shoe = shoeRepository.findById(id);
-        return shoe.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<Shoe> getShoe(@PathVariable Long id) {
+        return shoeRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    // 4. NEU: Bearbeiten (z.B. Status ändern)
+    // --- NEU: Historie abrufen ---
+    @GetMapping("/{id}/history")
+    public List<ShoeHistory> getShoeHistory(@PathVariable Long id) {
+        return historyRepository.findByShoeIdOrderByRentedAtDesc(id);
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<Shoe> updateShoe(@PathVariable Long id, @RequestBody Shoe shoeDetails) {
-        Optional<Shoe> optionalShoe = shoeRepository.findById(id);
+        return shoeRepository.findById(id).map(shoe -> {
+            String oldStatus = shoe.getStatus();
+            String newStatus = shoeDetails.getStatus();
 
-        if (optionalShoe.isPresent()) {
-            Shoe existingShoe = optionalShoe.get();
-            // Wir aktualisieren die Werte
-            existingShoe.setInventoryNumber(shoeDetails.getInventoryNumber());
-            existingShoe.setType(shoeDetails.getType());
-            existingShoe.setSize(shoeDetails.getSize());
-            existingShoe.setStatus(shoeDetails.getStatus());
-            existingShoe.setCondition(shoeDetails.getCondition());
-            // Speichern
-            Shoe updatedShoe = shoeRepository.save(existingShoe);
-            return ResponseEntity.ok(updatedShoe);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // 5. Löschen
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteShoe(@PathVariable Long id) {
-        if (shoeRepository.existsById(id)) {
-            shoeRepository.deleteById(id);
-            return ResponseEntity.noContent().build();
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-
-    // 6. Bild hochladen (POST /api/shoes/{id}/image)
-    @PostMapping("/{id}/image")
-    public ResponseEntity<String> uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
-        try {
-            Optional<Shoe> shoeOptional = shoeRepository.findById(id);
-            if (shoeOptional.isPresent()) {
-                Shoe shoe = shoeOptional.get();
-                // Datei in Bytes umwandeln und speichern
-                shoe.setImage(file.getBytes());
-                shoeRepository.save(shoe);
-                return ResponseEntity.ok("Bild gespeichert!");
+            // 1. Wenn Schuh neu verliehen wird -> Historie starten
+            if (!"Ausgeliehen".equals(oldStatus) && "Ausgeliehen".equals(newStatus)) {
+                ShoeHistory history = new ShoeHistory(shoe, shoeDetails.getCurrentProduction(), LocalDate.now());
+                historyRepository.save(history);
             }
-            return ResponseEntity.notFound().build();
+
+            // 2. Wenn Schuh zurückgegeben wird -> Historie abschließen
+            if ("Ausgeliehen".equals(oldStatus) && !"Ausgeliehen".equals(newStatus)) {
+                closeHistory(shoe);
+                // Produktion im Schuh leeren, da er ja zurück ist
+                shoe.setCurrentProduction(null);
+                shoe.setReturnDate(null);
+            } else {
+                // Sonst normale Daten Updates
+                shoe.setCurrentProduction(shoeDetails.getCurrentProduction());
+                shoe.setReturnDate(shoeDetails.getReturnDate());
+            }
+
+            shoe.setInventoryNumber(shoeDetails.getInventoryNumber());
+            shoe.setType(shoeDetails.getType());
+            shoe.setSize(shoeDetails.getSize());
+            shoe.setStatus(newStatus);
+
+            return ResponseEntity.ok(shoeRepository.save(shoe));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteShoe(@PathVariable Long id) {
+        return shoeRepository.findById(id).map(shoe -> {
+            shoeRepository.delete(shoe);
+            return ResponseEntity.ok().build();
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // --- BULK ACTIONS (Erweitert um Historie) ---
+
+    @PostMapping("/bulk-rent")
+    public ResponseEntity<?> bulkRent(@RequestBody Map<String, Object> payload) {
+        List<Integer> ids = (List<Integer>) payload.get("shoeIds");
+        String production = (String) payload.get("production");
+        String dateStr = (String) payload.get("returnDate");
+        LocalDate returnDate = (dateStr != null && !dateStr.isEmpty()) ? LocalDate.parse(dateStr) : null;
+
+        for (Integer id : ids) {
+            shoeRepository.findById(Long.valueOf(id)).ifPresent(shoe -> {
+                // Nur wenn er noch nicht verliehen war, Historie schreiben
+                if (!"Ausgeliehen".equals(shoe.getStatus())) {
+                    ShoeHistory history = new ShoeHistory(shoe, production, LocalDate.now());
+                    historyRepository.save(history);
+                }
+
+                shoe.setStatus("Ausgeliehen");
+                shoe.setCurrentProduction(production);
+                shoe.setReturnDate(returnDate);
+                shoeRepository.save(shoe);
+            });
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/bulk-return")
+    public ResponseEntity<?> bulkReturn(@RequestBody List<Integer> ids) {
+        for (Integer id : ids) {
+            shoeRepository.findById(Long.valueOf(id)).ifPresent(shoe -> {
+                if ("Ausgeliehen".equals(shoe.getStatus())) {
+                    closeHistory(shoe);
+                }
+                shoe.setStatus("Verfügbar");
+                shoe.setCurrentProduction(null);
+                shoe.setReturnDate(null);
+                shoeRepository.save(shoe);
+            });
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    // --- Helper Methode zum Schließen der Historie ---
+    private void closeHistory(Shoe shoe) {
+        Optional<ShoeHistory> openEntry = historyRepository.findByShoeIdAndReturnedAtIsNull(shoe.getId());
+        if (openEntry.isPresent()) {
+            ShoeHistory h = openEntry.get();
+            h.setReturnedAt(LocalDate.now());
+            historyRepository.save(h);
+        }
+    }
+
+    // --- BILDER UPLOAD (Unverändert) ---
+    @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        try {
+            Shoe shoe = shoeRepository.findById(id).orElseThrow(() -> new RuntimeException("Schuh nicht gefunden"));
+            shoe.setImageData(file.getBytes());
+            shoe.setImageType(file.getContentType());
+            shoeRepository.save(shoe);
+            return ResponseEntity.ok("Bild gespeichert");
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body("Fehler beim Upload");
         }
     }
 
-
-    // 7. Bild anzeigen (GET /api/shoes/{id}/image)
-    @GetMapping("/{id}/image")
-    public ResponseEntity<byte[]> getImage(@PathVariable Long id) {
-        Optional<Shoe> shoeOptional = shoeRepository.findById(id);
-        if (shoeOptional.isPresent() && shoeOptional.get().getImage() != null) {
-            Shoe shoe = shoeOptional.get();
-            return ResponseEntity.ok()
-                    // Wir sagen dem Browser: Das hier ist ein Bild (JPEG/PNG)
-                    .header("Content-Type", "image/jpeg")
-                    .body(shoe.getImage());
-        }
-        return ResponseEntity.notFound().build();
-    }
-    // ... (deine bisherigen Methoden) ...
-
-    // 8. MASSEN-AUSLEIHE (Bulk Rent)
-    @PostMapping("/bulk-rent")
-    public ResponseEntity<String> bulkRent(@RequestBody BulkRentRequest request) {
-        List<Shoe> shoes = shoeRepository.findAllById(request.getShoeIds());
-
-        for (Shoe shoe : shoes) {
-            shoe.setStatus("Ausgeliehen");
-            shoe.setCurrentProduction(request.getProduction());
-            shoe.setReturnDate(request.getReturnDate());
-        }
-
-        shoeRepository.saveAll(shoes);
-        return ResponseEntity.ok(shoes.size() + " Schuhe an " + request.getProduction() + " verliehen.");
-    }
-
-    // 9. MASSEN-RÜCKGABE (Bulk Return)
-    @PostMapping("/bulk-return")
-    public ResponseEntity<String> bulkReturn(@RequestBody List<Long> shoeIds) {
-        List<Shoe> shoes = shoeRepository.findAllById(shoeIds);
-
-        for (Shoe shoe : shoes) {
-            shoe.setStatus("Verfügbar");
-            shoe.setCurrentProduction(null);
-            shoe.setReturnDate(null);
-        }
-
-        shoeRepository.saveAll(shoes);
-        return ResponseEntity.ok(shoes.size() + " Schuhe zurückgegeben.");
-    }
-
-    // --- HILFSKLASSE FÜR DIE ANFRAGE ---
-    // (Füge das einfach innerhalb der ShoeController-Klammern ganz unten ein)
-    public static class BulkRentRequest {
-        private List<Long> shoeIds;
-        private String production;
-        private java.time.LocalDate returnDate;
-
-        // Getter und Setter
-        public List<Long> getShoeIds() { return shoeIds; }
-        public void setShoeIds(List<Long> shoeIds) { this.shoeIds = shoeIds; }
-        public String getProduction() { return production; }
-        public void setProduction(String production) { this.production = production; }
-        public java.time.LocalDate getReturnDate() { return returnDate; }
-        public void setReturnDate(java.time.LocalDate returnDate) { this.returnDate = returnDate; }
+    // Wir ändern <byte[]> zu <?>
+    @GetMapping(value = "/{id}/image")
+    public ResponseEntity<?> getImage(@PathVariable Long id) {
+        return shoeRepository.findById(id)
+                .map(shoe -> {
+                    if (shoe.getImageData() == null) {
+                        // Das hier ist ResponseEntity<Void>, deshalb brauchten wir das <?>
+                        return ResponseEntity.notFound().build();
+                    }
+                    return ResponseEntity.ok()
+                            .contentType(MediaType.parseMediaType(shoe.getImageType()))
+                            .body(shoe.getImageData());
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 }

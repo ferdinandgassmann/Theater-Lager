@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ShoeForm from './components/ShoeForm';
-import API_URL from './config'; // WICHTIG: Config importieren
+import HistoryModal from './components/HistoryModal'; // <--- NEU IMPORTIERT
+import API_URL from './config';
 
 const SHOE_TYPES = [
   "Halbschuhe (Herren)", "Halbschuhe (Damen)", "Stiefel (Allgemein)",
@@ -26,11 +27,13 @@ function App() {
   const [bulkProduction, setBulkProduction] = useState('');
   const [bulkDate, setBulkDate] = useState('');
 
+  // --- NEU: HISTORIE STATE ---
+  const [historyShoe, setHistoryShoe] = useState(null); // Speichert den Schuh, dessen Verlauf wir sehen wollen
+
   const auth = { username: 'schuhfee', password: 'theater123' };
 
   // --- DATA FETCHING ---
   const fetchShoes = () => {
-    // KORRIGIERT: API_URL nutzen
     axios.get(`${API_URL}/api/shoes`, { auth })
       .then(res => setShoes(res.data))
       .catch(err => setError('Konnte Backend nicht erreichen.'));
@@ -45,7 +48,6 @@ function App() {
 
   const handleDelete = (id) => {
     if(!window.confirm("Schuh wirklich löschen?")) return;
-    // KORRIGIERT: API_URL nutzen
     axios.delete(`${API_URL}/api/shoes/${id}`, { auth })
       .then(() => {
         setShoes(prev => prev.filter(shoe => shoe.id !== id));
@@ -78,7 +80,6 @@ function App() {
   // --- BULK ACTIONS ---
   const handleBulkRent = () => {
     if (!bulkProduction) return alert("Bitte einen Produktions-Namen eingeben!");
-    // KORRIGIERT: API_URL nutzen
     axios.post(`${API_URL}/api/shoes/bulk-rent`, {
       shoeIds: selectedIds, production: bulkProduction, returnDate: bulkDate || null
     }, { auth })
@@ -91,20 +92,9 @@ function App() {
 
   const handleBulkReturn = () => {
     if(!window.confirm(`${selectedIds.length} Schuhe als 'Verfügbar' markieren?`)) return;
-    // KORRIGIERT: API_URL nutzen
     axios.post(`${API_URL}/api/shoes/bulk-return`, selectedIds, { auth })
     .then(() => { fetchShoes(); clearSelection(); })
     .catch(err => alert("Fehler bei Rückgabe: " + err));
-  };
-
-  const handleStatusChange = (shoe, newStatus) => {
-    const updatedShoe = { ...shoe, status: newStatus };
-    // KORRIGIERT: API_URL nutzen
-    axios.put(`${API_URL}/api/shoes/${shoe.id}`, updatedShoe, { auth })
-      .then(response => {
-        setShoes(prev => prev.map(s => (s.id === shoe.id ? response.data : s)));
-      })
-      .catch(() => alert("Fehler beim Status-Update"));
   };
 
   // --- HELPER ---
@@ -134,7 +124,7 @@ function App() {
         <div className="mb-8">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight cursor-pointer" onClick={() => setFilterStatus('Alle')}>
-                🎭 Theater Schuh Lager
+                🎭 Theater Fundus
                 </h1>
                 <button
                     onClick={() => setShowForm(!showForm)}
@@ -224,18 +214,20 @@ function App() {
             return (
                 <div key={shoe.id} onClick={() => toggleSelection(shoe.id)} className={`relative bg-white rounded-xl shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden group ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50' : 'border-gray-100 hover:shadow-md'}`}>
 
+                  {/* Select Icon */}
                   <div className={`absolute top-2 left-2 z-20 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300'}`}>
                           {isSelected && <span className="text-white font-bold text-xs">✓</span>}
                       </div>
                   </div>
 
+                  {/* Inv Nummer */}
                   <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur text-gray-600 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded shadow-sm">
                     {shoe.inventoryNumber}
                   </div>
 
+                  {/* Bild */}
                   <div className="h-32 w-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                    {/* KORRIGIERT: API_URL nutzen und Backticks für den String */}
                     <img
                         src={`${API_URL}/api/shoes/${shoe.id}/image`}
                         alt=""
@@ -247,27 +239,55 @@ function App() {
                   <div className="p-3">
                     <h2 className="text-sm font-bold text-gray-800 truncate" title={shoe.type}>{shoe.type}</h2>
                     <p className="text-xs text-gray-500">Größe: <span className="font-bold text-gray-800">{shoe.size}</span></p>
+
                     <div className="mt-2 flex flex-wrap gap-1">
                         <span className={`text-[10px] px-1.5 py-0.5 rounded border ${shoe.status === 'Verfügbar' ? 'bg-green-50 text-green-700 border-green-200' : shoe.status === 'Ausgeliehen' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                             {shoe.status}
                         </span>
                     </div>
+
                     {shoe.status === 'Ausgeliehen' && shoe.currentProduction && (
                         <div className="mt-2 bg-yellow-50 p-1.5 rounded border border-yellow-100">
                             <p className="text-[10px] text-gray-500 uppercase font-bold">Im Stück:</p>
                             <p className="text-xs font-bold text-gray-800 truncate" title={shoe.currentProduction}>🎭 {shoe.currentProduction}</p>
                         </div>
                     )}
-                  </div>
 
-                   <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }} className="text-gray-300 hover:text-red-500 p-1" title="Löschen">🗑</button>
-                   </div>
+                   {/* --- BUTTONS SIND JETZT IMMER SICHTBAR --- */}
+                    <div className="mt-3 pt-2 border-t border-gray-100 flex justify-between items-center">
+                                            {/* Verlauf Button */}
+                                           <button
+                                               onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }}
+                                               className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1.5 rounded font-bold flex items-center gap-1 transition-colors"
+                                               title="Verlauf anzeigen"
+                                           >
+                                               📜 Verlauf
+                                           </button>
+
+                                           {/* Löschen Button (ganz dezent in grau) */}
+                                           <button
+                                               onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }}
+                                               className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                                               title="Löschen"
+                                           >
+                                               🗑
+                                           </button>
+                                       </div>
+
+                  </div>
                 </div>
             );
           })}
         </div>
       </div>
+
+      {/* --- MODAL WIRD HIER ANGEZEIGT WENN NOTWENDIG --- */}
+      {historyShoe && (
+          <HistoryModal
+            shoe={historyShoe}
+            onClose={() => setHistoryShoe(null)}
+          />
+      )}
 
       {/* BULK ACTION BAR */}
       {selectedIds.length > 0 && (
