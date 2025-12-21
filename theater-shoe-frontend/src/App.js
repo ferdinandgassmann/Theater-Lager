@@ -292,125 +292,127 @@ function App() {
         {/* GRID VIEW */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredShoes.map(shoe => {
-            const isSelected = selectedIds.includes(shoe.id);
+                      const isSelected = selectedIds.includes(shoe.id);
 
-            return (
-                <div key={shoe.id} onClick={() => toggleSelection(shoe.id)} className={`relative bg-white rounded-xl shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden group ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50' : 'border-gray-100 hover:shadow-md'}`}>
-                  {/* Select Icon */}
-                  <div className={`absolute top-2 left-2 z-20 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300'}`}>
-                          {isSelected && <span className="text-white font-bold text-xs">✓</span>}
-                      </div>
-                  </div>
+                      return (
+                          <div key={shoe.id} onClick={() => toggleSelection(shoe.id)} className={`relative bg-white rounded-xl shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden group ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50' : 'border-gray-100 hover:shadow-md'}`}>
 
-                  {/* Nur anzeigen, wenn shelfLocation existiert */}
-                  {shoe.shelfLocation && (
-                      <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur text-blue-900 text-[10px] font-bold uppercase px-2 py-1 rounded-lg shadow-sm border border-blue-100 flex items-center gap-1">
-                          <span>📍</span> {shoe.shelfLocation}
-                      </div>
-                  )}
+                            {/* --- FIX 2: CHECKMARK (HAKEN) --- */}
+                            {/* z-30 stellt sicher, dass er ÜBER dem Bild liegt. onClick mit stopPropagation sorgt für sauberes Deselektieren */}
+                            <div
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSelection(shoe.id);
+                                }}
+                                className={`absolute top-2 left-2 z-30 transition-opacity hover:scale-110 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 md:opacity-0'}`}
+                            >
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shadow-sm ${isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300'}`}>
+                                    {isSelected && <span className="text-white font-bold text-xs">✓</span>}
+                                </div>
+                            </div>
 
-                  {/* BILD BEREICH */}
-                                    <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
-                                        {(shoe.imageUpdate || shoe.hasImage) ? (
-                                          <>
-                                             <img
-                                                src={`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`}
-                                                alt={shoe.type}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    e.target.style.display = 'none';
-                                                    e.target.nextSibling.style.display = 'flex';
-                                                }}
-                                             />
+                            {/* Lagerplatz Label */}
+                            {shoe.shelfLocation && (
+                                <div className="absolute top-2 right-2 z-20 bg-white/90 backdrop-blur text-blue-900 text-[10px] font-bold uppercase px-2 py-1 rounded-lg shadow-sm border border-blue-100 flex items-center gap-1">
+                                    <span>📍</span> {shoe.shelfLocation}
+                                </div>
+                            )}
 
-                                             {/* OVERLAY: Klick-Bereich für Zoom (Lupe) */}
-                                             <div
-                                                  onClick={(e) => {
-                                                    e.stopPropagation(); // WICHTIG: Verhindert Auswahl des Schuhs!
-                                                    setViewingImage(`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`);
-                                                  }}
-                                                  className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 md:opacity-0 md:hover:opacity-100 touch-target-mobile transition-opacity bg-gradient-to-t from-black/50 via-transparent to-transparent cursor-zoom-in"
-                                             >
-                                                  {/* Auf Mobile zeigen wir das Icon immer leicht an, damit man weiß, dass man klicken kann */}
-                                                  <div className="bg-white/90 text-blue-900 rounded-full p-1.5 shadow-sm hover:scale-110 transition-transform md:hidden block">
-                                                      🔍
-                                                  </div>
-                                                  {/* Auf Desktop nur beim Hovern (durch group-hover oben geregelt) */}
-                                                  <div className="bg-white/90 text-blue-900 rounded-full p-1.5 shadow-sm hover:scale-110 transition-transform hidden md:block">
-                                                      🔍
-                                                  </div>
-                                             </div>
-                                          </>
-                                        ) : null}
+                            {/* BILD BEREICH */}
+                            <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
+                                {(shoe.imageUpdate || shoe.hasImage) ? (
+                                  <>
+                                     <img
+                                        src={`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`}
+                                        alt={shoe.type}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.nextSibling.style.display = 'flex';
+                                        }}
+                                     />
 
-                                        {/* Fallback Icon (Kein Foto) */}
-                                        <div className={`w-full h-full flex flex-col items-center justify-center text-blue-300 absolute top-0 left-0 ${(shoe.imageUpdate || shoe.hasImage) ? 'hidden' : 'flex'}`}>
-                                            <span className="text-4xl">👞</span>
-                                            <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
-                                        </div>
-                                    </div>
+                                     {/* --- FIX 1: LUPE PERMANENT AUF MOBILE --- */}
+                                     {/* opacity-100 (immer sichtbar) ist Standard. md:opacity-0 (Desktop unsichtbar) überschreibt das. */}
+                                     <div
+                                          onClick={(e) => {
+                                            e.stopPropagation(); // Verhindert Auswahl des Schuhs -> Öffnet nur Bild
+                                            setViewingImage(`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`);
+                                          }}
+                                          className="absolute inset-0 flex items-end justify-end p-2 touch-target-mobile transition-opacity bg-gradient-to-t from-black/40 via-transparent to-transparent cursor-zoom-in opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                                     >
+                                          <div className="bg-white/90 text-blue-900 rounded-full p-1.5 shadow-sm hover:scale-110 transition-transform">
+                                              🔍
+                                          </div>
+                                     </div>
+                                  </>
+                                ) : null}
 
-                  <div className="p-3">
-                    <h2 className="text-sm font-bold text-gray-800 truncate" title={shoe.type}>{shoe.type}</h2>
-                    <p className="text-xs text-gray-500">Größe: <span className="font-bold text-gray-800">{shoe.size}</span></p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${shoe.status === 'Verfügbar' ? 'bg-green-50 text-green-700 border-green-200' : shoe.status === 'Ausgeliehen' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                            {shoe.status}
-                        </span>
-                    </div>
-                    {shoe.status === 'Ausgeliehen' && shoe.currentProduction && (
-                        <div className="mt-2 bg-yellow-50 p-1.5 rounded border border-yellow-100">
-                            <p className="text-[10px] text-gray-500 uppercase font-bold">Im Stück:</p>
-                            <p className="text-xs font-bold text-gray-800 truncate" title={shoe.currentProduction}>🎭 {shoe.currentProduction}</p>
-                        </div>
-                    )}
-                    {/* --- NEU: BESCHREIBUNG / NOTIZ AUF DER KARTE --- */}
-                                        {shoe.description && (
-                                            <div
-                                                className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 italic"
-                                                title={shoe.description} // Zeigt beim Drüberfahren (Desktop) alles an
-                                            >
-                                                <span className="not-italic mr-1">📝</span>
-                                                {/* Text nach 60 Zeichen abschneiden, damit Karte nicht platzt */}
-                                                {shoe.description.length > 60
-                                                    ? shoe.description.substring(0, 60) + "..."
-                                                    : shoe.description}
-                                            </div>
-                                        )}
+                                {/* Fallback Icon */}
+                                <div className={`w-full h-full flex flex-col items-center justify-center text-blue-300 absolute top-0 left-0 ${(shoe.imageUpdate || shoe.hasImage) ? 'hidden' : 'flex'}`}>
+                                    <span className="text-4xl">👞</span>
+                                    <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
+                                </div>
+                            </div>
 
-                                        {/* ... hier drunter kommt die Action Bar (Buttons) ... */}
+                            <div className="p-3">
+                              <h2 className="text-sm font-bold text-gray-800 truncate" title={shoe.type}>{shoe.type}</h2>
+                              <p className="text-xs text-gray-500">Größe: <span className="font-bold text-gray-800">{shoe.size}</span></p>
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${shoe.status === 'Verfügbar' ? 'bg-green-50 text-green-700 border-green-200' : shoe.status === 'Ausgeliehen' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                      {shoe.status}
+                                  </span>
+                              </div>
+                              {shoe.status === 'Ausgeliehen' && shoe.currentProduction && (
+                                  <div className="mt-2 bg-yellow-50 p-1.5 rounded border border-yellow-100">
+                                      <p className="text-[10px] text-gray-500 uppercase font-bold">Im Stück:</p>
+                                      <p className="text-xs font-bold text-gray-800 truncate" title={shoe.currentProduction}>🎭 {shoe.currentProduction}</p>
+                                  </div>
+                              )}
 
-                    {/* ACTION BAR - Clean & Right Aligned */}
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end items-center gap-2">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }}
-                            className="h-8 w-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-full flex items-center justify-center transition shadow-sm"
-                            title="Verlauf"
-                        >
-                            <span className="text-sm">📜</span>
-                        </button>
+                              {/* Notiz Anzeige */}
+                              {shoe.description && (
+                                  <div
+                                      className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 italic"
+                                      title={shoe.description}
+                                  >
+                                      <span className="not-italic mr-1">📝</span>
+                                      {shoe.description.length > 60
+                                          ? shoe.description.substring(0, 60) + "..."
+                                          : shoe.description}
+                                  </div>
+                              )}
 
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setEditingShoe(shoe); }}
-                            className="h-8 w-8 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-full flex items-center justify-center transition shadow-sm"
-                            title="Bearbeiten"
-                        >
-                            <span className="text-sm">✏️</span>
-                        </button>
+                              {/* ACTION BAR */}
+                              <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end items-center gap-2">
+                                  <button
+                                      onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }}
+                                      className="h-8 w-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-full flex items-center justify-center transition shadow-sm"
+                                      title="Verlauf"
+                                  >
+                                      <span className="text-sm">📜</span>
+                                  </button>
 
-                        <button
-                            onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }}
-                            className="h-8 w-8 bg-gray-50 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded-full flex items-center justify-center transition shadow-sm ml-1"
-                            title="Löschen"
-                        >
-                            <span className="text-sm">🗑</span>
-                        </button>
-                    </div>
-                  </div>
-                </div>
-            );
-          })}
+                                  <button
+                                      onClick={(e) => { e.stopPropagation(); setEditingShoe(shoe); }}
+                                      className="h-8 w-8 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-full flex items-center justify-center transition shadow-sm"
+                                      title="Bearbeiten"
+                                  >
+                                      <span className="text-sm">✏️</span>
+                                  </button>
+
+                                  <button
+                                      onClick={(e) => { e.stopPropagation(); handleDelete(shoe.id); }}
+                                      className="h-8 w-8 bg-gray-50 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded-full flex items-center justify-center transition shadow-sm ml-1"
+                                      title="Löschen"
+                                  >
+                                      <span className="text-sm">🗑</span>
+                                  </button>
+                              </div>
+                            </div>
+                          </div>
+                      );
+                    })}
         </div>
 
         {/* --- FOOTER MIT BACKUP BUTTON --- */}
