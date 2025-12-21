@@ -4,6 +4,7 @@ import ShoeForm from './components/ShoeForm';
 import HistoryModal from './components/HistoryModal';
 import EditShoeModal from './components/EditShoeModal';
 import API_URL from './config';
+import ImageModal from './components/ImageModal';
 
 // Standard Start-Werte (Fallback, falls DB leer ist)
 const DEFAULT_TYPES = [
@@ -32,6 +33,7 @@ function App() {
   // Modals
   const [historyShoe, setHistoryShoe] = useState(null);
   const [editingShoe, setEditingShoe] = useState(null);
+  const [viewingImage, setViewingImage] = useState(null);
 
   const auth = { username: 'schuhfee', password: 'theater123' };
 
@@ -309,27 +311,45 @@ function App() {
                   )}
 
                   {/* BILD BEREICH */}
-                  <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
-                      {(shoe.imageUpdate || shoe.hasImage) ? (
-                           <img
-                              // KORREKTUR: Keine Punkte am Ende und ?t=... für Cache-Reset
-                              src={`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`}
-                              alt={shoe.type}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                  // Wenn Bild nicht lädt: Bild ausblenden, Fallback einblenden
-                                  e.target.style.display = 'none';
-                                  e.target.nextSibling.style.display = 'flex';
-                              }}
-                           />
-                      ) : null}
+                                    <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
+                                        {(shoe.imageUpdate || shoe.hasImage) ? (
+                                          <>
+                                             <img
+                                                src={`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`}
+                                                alt={shoe.type}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                             />
 
-                      {/* Fallback Icon */}
-                      <div className={`w-full h-full flex flex-col items-center justify-center text-blue-300 absolute top-0 left-0 ${(shoe.imageUpdate || shoe.hasImage) ? 'hidden' : 'flex'}`}>
-                          <span className="text-4xl">👞</span>
-                          <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
-                      </div>
-                  </div>
+                                             {/* OVERLAY: Klick-Bereich für Zoom (Lupe) */}
+                                             <div
+                                                  onClick={(e) => {
+                                                    e.stopPropagation(); // WICHTIG: Verhindert Auswahl des Schuhs!
+                                                    setViewingImage(`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`);
+                                                  }}
+                                                  className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 md:opacity-0 md:hover:opacity-100 touch-target-mobile transition-opacity bg-gradient-to-t from-black/50 via-transparent to-transparent cursor-zoom-in"
+                                             >
+                                                  {/* Auf Mobile zeigen wir das Icon immer leicht an, damit man weiß, dass man klicken kann */}
+                                                  <div className="bg-white/90 text-blue-900 rounded-full p-1.5 shadow-sm hover:scale-110 transition-transform md:hidden block">
+                                                      🔍
+                                                  </div>
+                                                  {/* Auf Desktop nur beim Hovern (durch group-hover oben geregelt) */}
+                                                  <div className="bg-white/90 text-blue-900 rounded-full p-1.5 shadow-sm hover:scale-110 transition-transform hidden md:block">
+                                                      🔍
+                                                  </div>
+                                             </div>
+                                          </>
+                                        ) : null}
+
+                                        {/* Fallback Icon (Kein Foto) */}
+                                        <div className={`w-full h-full flex flex-col items-center justify-center text-blue-300 absolute top-0 left-0 ${(shoe.imageUpdate || shoe.hasImage) ? 'hidden' : 'flex'}`}>
+                                            <span className="text-4xl">👞</span>
+                                            <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
+                                        </div>
+                                    </div>
 
                   <div className="p-3">
                     <h2 className="text-sm font-bold text-gray-800 truncate" title={shoe.type}>{shoe.type}</h2>
@@ -405,6 +425,8 @@ function App() {
 
       {/* --- MODALS --- */}
       {historyShoe && <HistoryModal shoe={historyShoe} onClose={() => setHistoryShoe(null)} />}
+      {/* Das Bild-Modal einfügen: */}
+      {viewingImage && <ImageModal imageUrl={viewingImage} onClose={() => setViewingImage(null)} />}
 
       {/* Übergabe der dynamischen Kategorien an das Bearbeiten-Fenster */}
       {editingShoe && (
