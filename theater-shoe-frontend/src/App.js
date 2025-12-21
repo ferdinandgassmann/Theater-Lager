@@ -5,18 +5,19 @@ import HistoryModal from './components/HistoryModal';
 import EditShoeModal from './components/EditShoeModal';
 import API_URL from './config';
 
-const SHOE_TYPES = [
-  "Halbschuhe (Herren)", "Halbschuhe (Damen)", "Stiefel (Allgemein)",
-  "Stiefeletten", "Marschstiefel", "Reitstiefel", "Pumps", "Sandalen",
-  "Sneakers / Turnschuhe", "Barockschuhe", "Schnabelschuhe", "Tanzschuhe",
-  "Plateauschuhe", "Arbeitsschuhe", "Hausschuhe", "Mokassins", "Clogs",
-  "Ballettschuhe", "Römersandalen", "Gamaschen", "Historisch (Sonstige)", "Sonstiges"
+// Standard Start-Werte (Fallback, falls DB leer ist)
+const DEFAULT_TYPES = [
+  "Halbschuhe (Herren)", "Halbschuhe (Damen)", "Stiefel", "Stiefeletten",
+  "Pumps", "Sandalen", "Sneaker", "Historisch", "Sonstiges"
 ];
 
 function App() {
   const [shoes, setShoes] = useState([]);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  // NEU: Dynamische Kategorien für den Filter
+  const [shoeTypes, setShoeTypes] = useState(DEFAULT_TYPES);
 
   // Filter & Auswahl States
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,20 +37,40 @@ function App() {
 
   // --- DATA FETCHING ---
   const fetchShoes = () => {
+    // 1. Schuhe laden
     axios.get(`${API_URL}/api/shoes`, { auth })
       .then(res => setShoes(res.data))
       .catch(err => setError('Konnte Backend nicht erreichen.'));
+
+    // 2. Kategorien laden (für den Filter)
+    axios.get(`${API_URL}/api/shoes/types`, { auth })
+      .then(res => {
+         if(res.data && res.data.length > 0) {
+             // Wir mischen Defaults mit DB-Werten und entfernen Duplikate
+             const merged = Array.from(new Set([...DEFAULT_TYPES, ...res.data])).sort();
+             setShoeTypes(merged);
+         }
+      })
+      .catch(console.error);
   };
 
   useEffect(() => { fetchShoes(); }, []);
 
   const handleShoeAdded = (newShoe) => {
     setShoes(prev => [...prev, newShoe]);
+    // Wenn es ein neuer Typ ist (Custom), fügen wir ihn auch dem Filter hinzu
+    if(newShoe.type && !shoeTypes.includes(newShoe.type)) {
+        setShoeTypes(prev => [...prev, newShoe.type].sort());
+    }
     setShowForm(false);
   };
 
   const handleShoeUpdated = (updatedShoe) => {
     setShoes(prev => prev.map(s => s.id === updatedShoe.id ? updatedShoe : s));
+    // Auch hier prüfen, ob durch Bearbeiten eine neue Kategorie entstand
+    if(updatedShoe.type && !shoeTypes.includes(updatedShoe.type)) {
+        setShoeTypes(prev => [...prev, updatedShoe.type].sort());
+    }
     setEditingShoe(null);
   };
 
@@ -63,9 +84,9 @@ function App() {
       .catch(err => alert("Fehler: " + err));
   };
 
-  // --- NEU: BACKUP / EXPORT FUNKTION ---
- const handleExport = () => {
-     // CSV Header (Jetzt mit Beschreibung und Bild-Link)
+  // --- BACKUP / EXPORT FUNKTION ---
+  const handleExport = () => {
+     // CSV Header
      let csvContent = "data:text/csv;charset=utf-8,";
      csvContent += "Regal/Kiste;Typ;Größe;Status;Produktion;Beschreibung;Bild-Link\n";
 
@@ -159,39 +180,38 @@ function App() {
         {/* HEADER */}
         <div className="mb-8">
            {/* HEADER BEREICH */}
-                       <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
-                           {/* LOGO & TITEL KOMBINATION */}
-                           <div
-                               className="flex items-center gap-6 cursor-pointer group select-none"
-                               onClick={() => setFilterStatus('Alle')}
-                           >
-                               {/* DAS LOGO: Jetzt riesig und ohne Rand */}
-                               <img
-                                   src="/logo.png"
-                                   alt="Shoe on a Shelf Logo"
-                                   // ÄNDERUNG HIER: w-32 h-32 (statt 16), border entfernt
-                                   className="w-32 h-32 rounded-2xl shadow-lg group-hover:scale-105 transition-transform bg-blue-50"
-                               />
-                               <div>
-                                   {/* Titel auch etwas größer gemacht */}
-                                   <h1 className="text-4xl md:text-5xl font-extrabold text-blue-800 tracking-tight leading-none">
-                                       Shoe on a Shelf
-                                   </h1>
-                                   <p className="text-sm text-blue-500 font-bold uppercase tracking-wider mt-2 pl-1">
-                                       Theater Schuh Lager
-                                   </p>
-                               </div>
-                           </div>
+           <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+               {/* LOGO & TITEL KOMBINATION */}
+               <div
+                   className="flex items-center gap-6 cursor-pointer group select-none"
+                   onClick={() => setFilterStatus('Alle')}
+               >
+                   {/* DAS LOGO */}
+                   <img
+                       src="/logo.png"
+                       alt="Shoe on a Shelf Logo"
+                       className="w-32 h-32 rounded-2xl shadow-lg group-hover:scale-105 transition-transform bg-blue-50"
+                       onError={(e) => { e.target.style.display='none'; }} // Falls Logo fehlt, einfach ausblenden
+                   />
+                   <div>
+                       <h1 className="text-4xl md:text-5xl font-extrabold text-blue-800 tracking-tight leading-none">
+                           Shoe on a Shelf
+                       </h1>
+                       <p className="text-sm text-blue-500 font-bold uppercase tracking-wider mt-2 pl-1">
+                           Theater Schuh Lager
+                       </p>
+                   </div>
+               </div>
 
-                           {/* BUTTON */}
-                           <button
-                               onClick={() => setShowForm(!showForm)}
-                               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-3 text-lg"
-                           >
-                               <span>{showForm ? 'Schließen' : 'Neu erfassen'}</span>
-                               {!showForm && <span className="text-2xl leading-none pb-1">+</span>}
-                           </button>
-                       </div>
+               {/* BUTTON */}
+               <button
+                   onClick={() => setShowForm(!showForm)}
+                   className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-3 text-lg"
+               >
+                   <span>{showForm ? 'Schließen' : 'Neu erfassen'}</span>
+                   {!showForm && <span className="text-2xl leading-none pb-1">+</span>}
+               </button>
+           </div>
 
             {/* DASHBOARD KACHELN */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -254,9 +274,10 @@ function App() {
             </div>
             <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kategorie</label>
+                {/* DYNAMISCHE KATEGORIEN IM FILTER */}
                 <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full p-2 border border-gray-300 rounded bg-white">
                     <option value="Alle">Alle Kategorien</option>
-                    {SHOE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                    {shoeTypes.map(type => <option key={type} value={type}>{type}</option>)}
                 </select>
             </div>
             <div>
@@ -264,13 +285,12 @@ function App() {
             </div>
         </div>
 
-        {showForm && <ShoeForm onShoeAdded={handleShoeAdded} shoeTypes={SHOE_TYPES} />}
+        {showForm && <ShoeForm onShoeAdded={handleShoeAdded} />}
 
         {/* GRID VIEW */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredShoes.map(shoe => {
             const isSelected = selectedIds.includes(shoe.id);
-            const imageUrl = `${API_URL}/api/shoes/${shoe.id}/image` + (shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : '');
 
             return (
                 <div key={shoe.id} onClick={() => toggleSelection(shoe.id)} className={`relative bg-white rounded-xl shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden group ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50' : 'border-gray-100 hover:shadow-md'}`}>
@@ -280,36 +300,37 @@ function App() {
                           {isSelected && <span className="text-white font-bold text-xs">✓</span>}
                       </div>
                   </div>
+
                   {/* Nur anzeigen, wenn shelfLocation existiert */}
                   {shoe.shelfLocation && (
                       <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur text-blue-900 text-[10px] font-bold uppercase px-2 py-1 rounded-lg shadow-sm border border-blue-100 flex items-center gap-1">
                           <span>📍</span> {shoe.shelfLocation}
                       </div>
                   )}
-                  {/* BILD BEREICH */}
-                                    <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
-                                        {(shoe.imageUpdate || shoe.hasImage) ? (
-                                             <img
-                                                // KORREKTUR: Keine Punkte am Ende und ?t=... für Cache-Reset angefügt
-                                                src={`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`}
-                                                alt={shoe.type}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    // Wenn Bild nicht lädt: Bild ausblenden, Fallback einblenden
-                                                    e.target.style.display = 'none';
-                                                    // Sucht das nächste Element (den Fallback-Div) und zeigt ihn an
-                                                    e.target.nextSibling.style.display = 'flex';
-                                                }}
-                                             />
-                                        ) : null}
 
-                                        {/* Fallback Icon */}
-                                        {/* Ist standardmäßig 'hidden', wenn ein Bild da sein sollte. onError schaltet es auf 'flex' */}
-                                        <div className={`w-full h-full flex flex-col items-center justify-center text-blue-300 absolute top-0 left-0 ${(shoe.imageUpdate || shoe.hasImage) ? 'hidden' : 'flex'}`}>
-                                            <span className="text-4xl">👞</span>
-                                            <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
-                                        </div>
-                                    </div>
+                  {/* BILD BEREICH */}
+                  <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
+                      {(shoe.imageUpdate || shoe.hasImage) ? (
+                           <img
+                              // KORREKTUR: Keine Punkte am Ende und ?t=... für Cache-Reset
+                              src={`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`}
+                              alt={shoe.type}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                  // Wenn Bild nicht lädt: Bild ausblenden, Fallback einblenden
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                              }}
+                           />
+                      ) : null}
+
+                      {/* Fallback Icon */}
+                      <div className={`w-full h-full flex flex-col items-center justify-center text-blue-300 absolute top-0 left-0 ${(shoe.imageUpdate || shoe.hasImage) ? 'hidden' : 'flex'}`}>
+                          <span className="text-4xl">👞</span>
+                          <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
+                      </div>
+                  </div>
+
                   <div className="p-3">
                     <h2 className="text-sm font-bold text-gray-800 truncate" title={shoe.type}>{shoe.type}</h2>
                     <p className="text-xs text-gray-500">Größe: <span className="font-bold text-gray-800">{shoe.size}</span></p>
@@ -324,9 +345,24 @@ function App() {
                             <p className="text-xs font-bold text-gray-800 truncate" title={shoe.currentProduction}>🎭 {shoe.currentProduction}</p>
                         </div>
                     )}
+                    {/* --- NEU: BESCHREIBUNG / NOTIZ AUF DER KARTE --- */}
+                                        {shoe.description && (
+                                            <div
+                                                className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 italic"
+                                                title={shoe.description} // Zeigt beim Drüberfahren (Desktop) alles an
+                                            >
+                                                <span className="not-italic mr-1">📝</span>
+                                                {/* Text nach 60 Zeichen abschneiden, damit Karte nicht platzt */}
+                                                {shoe.description.length > 60
+                                                    ? shoe.description.substring(0, 60) + "..."
+                                                    : shoe.description}
+                                            </div>
+                                        )}
+
+                                        {/* ... hier drunter kommt die Action Bar (Buttons) ... */}
+
                     {/* ACTION BAR - Clean & Right Aligned */}
                     <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end items-center gap-2">
-
                         <button
                             onClick={(e) => { e.stopPropagation(); setHistoryShoe(shoe); }}
                             className="h-8 w-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-full flex items-center justify-center transition shadow-sm"
@@ -357,7 +393,7 @@ function App() {
           })}
         </div>
 
-        {/* --- NEU: FOOTER MIT BACKUP BUTTON --- */}
+        {/* --- FOOTER MIT BACKUP BUTTON --- */}
         <div className="mt-12 text-center border-t border-gray-200 pt-8 pb-4">
             <button onClick={handleExport} className="text-sm text-gray-500 hover:text-gray-800 flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded hover:bg-gray-100 transition">
                 📥 Datensicherung herunterladen (.csv)
@@ -369,7 +405,16 @@ function App() {
 
       {/* --- MODALS --- */}
       {historyShoe && <HistoryModal shoe={historyShoe} onClose={() => setHistoryShoe(null)} />}
-      {editingShoe && <EditShoeModal shoe={editingShoe} shoeTypes={SHOE_TYPES} onClose={() => setEditingShoe(null)} onUpdate={handleShoeUpdated} />}
+
+      {/* Übergabe der dynamischen Kategorien an das Bearbeiten-Fenster */}
+      {editingShoe && (
+          <EditShoeModal
+            shoe={editingShoe}
+            shoeTypes={shoeTypes}
+            onClose={() => setEditingShoe(null)}
+            onUpdate={handleShoeUpdated}
+          />
+      )}
 
       {/* BULK ACTION BAR */}
       {selectedIds.length > 0 && (

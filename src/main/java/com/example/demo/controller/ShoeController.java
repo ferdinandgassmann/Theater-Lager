@@ -20,7 +20,7 @@ import java.util.Optional;
 public class ShoeController {
 
     private final ShoeRepository shoeRepository;
-    private final ShoeHistoryRepository historyRepository; // NEU
+    private final ShoeHistoryRepository historyRepository;
 
     public ShoeController(ShoeRepository shoeRepository, ShoeHistoryRepository historyRepository) {
         this.shoeRepository = shoeRepository;
@@ -30,6 +30,12 @@ public class ShoeController {
     @GetMapping
     public List<Shoe> getAllShoes() {
         return shoeRepository.findAll();
+    }
+
+    // --- WICHTIG FÜR DAS DROPDOWN MENÜ ---
+    @GetMapping("/types")
+    public List<String> getShoeTypes() {
+        return shoeRepository.findDistinctTypes();
     }
 
     @PostMapping
@@ -44,7 +50,7 @@ public class ShoeController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // --- NEU: Historie abrufen ---
+    // --- WICHTIG FÜR DAS HISTORY MODAL ---
     @GetMapping("/{id}/history")
     public List<ShoeHistory> getShoeHistory(@PathVariable Long id) {
         return historyRepository.findByShoeIdOrderByRentedAtDesc(id);
@@ -69,12 +75,14 @@ public class ShoeController {
                 shoe.setCurrentProduction(null);
                 shoe.setReturnDate(null);
             } else {
-                // Sonst normale Daten Updates
+                // Sonst normale Daten Updates (z.B. Produktion ändern während Verleih)
                 shoe.setCurrentProduction(shoeDetails.getCurrentProduction());
                 shoe.setReturnDate(shoeDetails.getReturnDate());
             }
+
+            // Stammdaten aktualisieren
             shoe.setShelfLocation(shoeDetails.getShelfLocation());
-            shoe.setDescription(shoeDetails.getDescription());
+            shoe.setDescription(shoeDetails.getDescription()); // <--- BESCHREIBUNG
             shoe.setInventoryNumber(shoeDetails.getInventoryNumber());
             shoe.setType(shoeDetails.getType());
             shoe.setSize(shoeDetails.getSize());
@@ -149,7 +157,7 @@ public class ShoeController {
         }
     }
 
-    // --- BILDER UPLOAD (Unverändert) ---
+    // --- BILDER UPLOAD ---
     @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
         try {
@@ -163,13 +171,11 @@ public class ShoeController {
         }
     }
 
-    // Wir ändern <byte[]> zu <?>
     @GetMapping(value = "/{id}/image")
     public ResponseEntity<?> getImage(@PathVariable Long id) {
         return shoeRepository.findById(id)
                 .map(shoe -> {
                     if (shoe.getImageData() == null) {
-                        // Das hier ist ResponseEntity<Void>, deshalb brauchten wir das <?>
                         return ResponseEntity.notFound().build();
                     }
                     return ResponseEntity.ok()

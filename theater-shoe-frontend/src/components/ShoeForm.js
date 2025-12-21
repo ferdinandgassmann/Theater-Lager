@@ -1,25 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // useEffect neu importiert
 import axios from 'axios';
 import API_URL from '../config';
 
-function ShoeForm({ onShoeAdded, shoeTypes }) {
+// Standard-Kategorien als Fallback, falls DB leer ist
+const DEFAULT_TYPES = [
+  "Halbschuhe (Herren)", "Halbschuhe (Damen)", "Stiefel", "Stiefeletten",
+  "Pumps", "Sandalen", "Sneaker", "Historisch", "Sonstiges"
+];
+
+function ShoeForm({ onShoeAdded }) {
   const [formData, setFormData] = useState({
     shelfLocation: '',
-    type: '', // Jetzt leerer Startwert für freie Eingabe
-    sizesInput: '', // NEU: String für "38, 39, 40"
-    description: '', // NEU: Beschreibung
+    type: '',
+    sizesInput: '',
+    description: '',
     image: null
   });
+
+  // States für die Kategorien-Logik
+  const [availableTypes, setAvailableTypes] = useState(DEFAULT_TYPES);
+  const [isCustomType, setIsCustomType] = useState(false); // Tippt man gerade was eigenes?
   const [loading, setLoading] = useState(false);
 
   const auth = { username: 'schuhfee', password: 'theater123' };
+
+  // 1. Beim Laden: Kategorien aus der DB holen
+  useEffect(() => {
+      axios.get(`${API_URL}/api/shoes/types`, { auth })
+        .then(res => {
+            if(res.data && res.data.length > 0) {
+                // Mische DB-Typen mit Defaults (und entferne Duplikate)
+                const merged = Array.from(new Set([...DEFAULT_TYPES, ...res.data])).sort();
+                setAvailableTypes(merged);
+            }
+        })
+        .catch(err => console.error("Konnte Kategorien nicht laden", err));
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    // 1. Größen splitten (Feature: Massen-Input)
-    // Aus "38, 39, 40" wird ein Array ["38", "39", "40"]
     const sizes = formData.sizesInput.split(',').map(s => s.trim()).filter(s => s !== '');
 
     if (sizes.length === 0) {
@@ -28,16 +49,22 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
         return;
     }
 
+    // Prüfen ob Typ gewählt wurde
+    if (!formData.type) {
+        alert("Bitte eine Kategorie wählen!");
+        setLoading(false);
+        return;
+    }
+
     try {
       let lastAddedShoe = null;
 
-      // 2. Schleife für jeden Schuh
       for (const size of sizes) {
           const shoePayload = {
             shelfLocation: formData.shelfLocation,
             inventoryNumber: "AUTO-" + Date.now() + Math.random().toString().slice(2,5),
-            type: formData.type || 'Sonstiges', // Fallback
-            size: size, // Die aktuelle Größe aus der Schleife
+            type: formData.type,
+            size: size,
             description: formData.description,
             status: 'Verfügbar'
           };
@@ -46,7 +73,6 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
           const newShoeId = res.data.id;
           lastAddedShoe = { ...res.data, shelfLocation: formData.shelfLocation, size: size };
 
-          // 3. Bild hochladen (das gleiche Bild für alle Schuhe in diesem Batch)
           if (formData.image) {
             const imagePayload = new FormData();
             imagePayload.append('file', formData.image);
@@ -54,16 +80,20 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 auth
             });
-            lastAddedShoe.hasImage = true; // Markierung für Frontend
+            lastAddedShoe.hasImage = true;
             lastAddedShoe.imageUpdate = Date.now();
           }
-
-          // Jeden Schuh einzeln zur Liste hinzufügen, damit man Fortschritt sieht
           onShoeAdded(lastAddedShoe);
+      }
+
+      // Falls wir eine neue Custom Kategorie hatten, fügen wir sie sofort zur Liste hinzu
+      if(isCustomType && !availableTypes.includes(formData.type)) {
+          setAvailableTypes(prev => [...prev, formData.type].sort());
       }
 
       // Reset
       setFormData({ shelfLocation: '', type: '', sizesInput: '', description: '', image: null });
+      setIsCustomType(false); // Zurück zum Dropdown
       alert(`${sizes.length} Schuh(e) erfolgreich angelegt!`);
 
     } catch (err) {
@@ -87,25 +117,52 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
             placeholder="z.B. A-01"
             value={formData.shelfLocation}
             onChange={e => setFormData({...formData, shelfLocation: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none uppercase font-bold"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase font-bold"
           />
         </div>
 
-        {/* Typ (Freitext + Vorschläge) */}
+        {/* SMART KATEGORIE WAHL */}
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kategorie / Typ</label>
-          <input
-            list="shoe-types-list" // Verknüpfung zur Datalist
-            type="text"
-            required
-            placeholder="Wählen oder Tippen..."
-            value={formData.type}
-            onChange={e => setFormData({...formData, type: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-          <datalist id="shoe-types-list">
-             {shoeTypes.map(t => <option key={t} value={t} />)}
-          </datalist>
+
+          {!isCustomType ? (
+              <select
+                value={formData.type}
+                onChange={(e) => {
+                    if(e.target.value === "NEW_CUSTOM_ENTRY") {
+                        setIsCustomType(true);
+                        setFormData({...formData, type: ''});
+                    } else {
+                        setFormData({...formData, type: e.target.value});
+                    }
+                }}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              >
+                  <option value="" disabled>Bitte wählen...</option>
+                  {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  <option disabled>──────────</option>
+                  <option value="NEW_CUSTOM_ENTRY" className="font-bold text-blue-600">✨ Neue Kategorie erstellen...</option>
+              </select>
+          ) : (
+              <div className="flex gap-2">
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Neue Kategorie eingeben..."
+                    value={formData.type}
+                    onChange={e => setFormData({...formData, type: e.target.value})}
+                    className="w-full p-3 border border-blue-500 ring-1 ring-blue-500 rounded-lg outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setIsCustomType(false); setFormData({...formData, type: ''}); }}
+                    className="px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-xl"
+                    title="Zurück zur Liste"
+                  >
+                    ↩
+                  </button>
+              </div>
+          )}
         </div>
       </div>
 
@@ -116,12 +173,11 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
           <input
             type="text"
             required
-            placeholder="z.B. 38, 39, 40 (Komma trennt!)"
+            placeholder="z.B. 38, 39, 40"
             value={formData.sizesInput}
             onChange={e => setFormData({...formData, sizesInput: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           />
-          <p className="text-[10px] text-gray-400 mt-1">Tipp: Mehrere Größen mit Komma trennen, um mehrere Schuhe anzulegen.</p>
         </div>
 
         {/* Bild */}
@@ -136,7 +192,7 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
         </div>
       </div>
 
-      {/* Beschreibung (NEU) */}
+      {/* Beschreibung */}
       <div className="mb-4">
           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beschreibung / Notizen</label>
           <textarea
@@ -144,11 +200,11 @@ function ShoeForm({ onShoeAdded, shoeTypes }) {
             placeholder="z.B. Roter Absatz, leichter Kratzer..."
             value={formData.description}
             onChange={e => setFormData({...formData, description: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
           />
       </div>
 
-      <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-lg flex justify-center">
+      <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-lg flex justify-center text-lg">
         {loading ? 'Speichere...' : 'Im Lager speichern'}
       </button>
     </form>

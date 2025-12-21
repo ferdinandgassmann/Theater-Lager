@@ -1,6 +1,7 @@
 package com.example.demo.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // Import prüfen
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
@@ -12,24 +13,22 @@ public class ShoeHistory {
 
     @ManyToOne
     @JoinColumn(name = "shoe_id")
-    @JsonIgnore // Verhindert Endlos-Schleifen beim Laden
+    @JsonIgnore // <--- DAS IST ENTSCHEIDEND! Verhindert Endlosschleifen.
     private Shoe shoe;
 
     private String production;
     private LocalDate rentedAt;
     private LocalDate returnedAt;
 
-    // Leerer Konstruktor für JPA
     public ShoeHistory() {}
 
-    // Bequemer Konstruktor für uns
     public ShoeHistory(Shoe shoe, String production, LocalDate rentedAt) {
         this.shoe = shoe;
         this.production = production;
         this.rentedAt = rentedAt;
     }
 
-    // --- Getters & Setters ---
+    // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Shoe getShoe() { return shoe; }
