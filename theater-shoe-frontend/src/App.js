@@ -295,16 +295,24 @@ function App() {
                       const isSelected = selectedIds.includes(shoe.id);
 
                       return (
-                          <div key={shoe.id} onClick={() => toggleSelection(shoe.id)} className={`relative bg-white rounded-xl shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden group ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50' : 'border-gray-100 hover:shadow-md'}`}>
+                          <div
+                              key={shoe.id}
+                              onClick={() => toggleSelection(shoe.id)}
+                              // ÄNDERUNG 1: "md:hover:shadow-md" statt "hover:shadow-md"
+                              // Das verhindert das Doppel-Tippen, weil sich auf dem Handy beim 1. Tippen optisch nichts ändert.
+                              className={`relative bg-white rounded-xl shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden group ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50' : 'border-gray-100 md:hover:shadow-md'}`}
+                          >
 
-                            {/* --- FIX 2: CHECKMARK (HAKEN) --- */}
-                            {/* z-30 stellt sicher, dass er ÜBER dem Bild liegt. onClick mit stopPropagation sorgt für sauberes Deselektieren */}
+                            {/* --- CHECKMARK (HAKEN) --- */}
                             <div
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     toggleSelection(shoe.id);
                                 }}
-                                className={`absolute top-2 left-2 z-30 transition-opacity hover:scale-110 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 md:opacity-0'}`}
+                                // ÄNDERUNG 2: Logik für Sichtbarkeit angepasst
+                                // Mobile: Immer sichtbar (opacity-100), damit man das Ziel sieht und sofort trifft.
+                                // Desktop (md): Unsichtbar (opacity-0), außer man hovert (group-hover:opacity-100).
+                                className={`absolute top-2 left-2 z-30 transition-opacity hover:scale-110 ${isSelected ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}
                             >
                                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shadow-sm ${isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300'}`}>
                                     {isSelected && <span className="text-white font-bold text-xs">✓</span>}
@@ -319,7 +327,8 @@ function App() {
                             )}
 
                             {/* BILD BEREICH */}
-                            <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
+                            {/* ÄNDERUNG 3: "md:group-hover:bg-blue-100" - Hintergrund wechselt nur auf Desktop */}
+                            <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative md:group-hover:bg-blue-100 transition-colors">
                                 {(shoe.imageUpdate || shoe.hasImage) ? (
                                   <>
                                      <img
@@ -332,13 +341,14 @@ function App() {
                                         }}
                                      />
 
-                                     {/* --- FIX 1: LUPE PERMANENT AUF MOBILE --- */}
-                                     {/* opacity-100 (immer sichtbar) ist Standard. md:opacity-0 (Desktop unsichtbar) überschreibt das. */}
+                                     {/* LUPE OVERLAY */}
                                      <div
                                           onClick={(e) => {
-                                            e.stopPropagation(); // Verhindert Auswahl des Schuhs -> Öffnet nur Bild
+                                            e.stopPropagation();
                                             setViewingImage(`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`);
                                           }}
+                                          // Lupe ist auf Mobile (Standard) immer da (opacity-100).
+                                          // Auf Desktop (md) ist sie weg, bis man hovert.
                                           className="absolute inset-0 flex items-end justify-end p-2 touch-target-mobile transition-opacity bg-gradient-to-t from-black/40 via-transparent to-transparent cursor-zoom-in opacity-100 md:opacity-0 md:group-hover:opacity-100"
                                      >
                                           <div className="bg-white/90 text-blue-900 rounded-full p-1.5 shadow-sm hover:scale-110 transition-transform">
