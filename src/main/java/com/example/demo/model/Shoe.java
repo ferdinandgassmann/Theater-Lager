@@ -3,7 +3,7 @@ package com.example.demo.model;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty; // Wichtig für explizite Benennung
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 public class Shoe {
@@ -24,7 +24,7 @@ public class Shoe {
     // --- BILDER DATEN ---
     @Lob
     @Column(length = 10000000)
-    private byte[] imageData; // Hier KEIN @JsonIgnore mehr, wir machen es unten am Getter
+    private byte[] imageData;
 
     private String imageType;
 
@@ -36,20 +36,17 @@ public class Shoe {
 
     // --- GETTERS & SETTERS ---
 
-    // --- WICHTIG: Das "virtuelle" Feld für das Frontend ---
-    @JsonProperty("hasImage") // Erzwingt, dass das Feld im JSON "hasImage" heißt
+    // Das virtuelle Feld "hasImage" für das Frontend bleibt
+    @JsonProperty("hasImage")
     public boolean getHasImage() {
         return imageData != null && imageData.length > 0;
     }
+    @JsonIgnore // <--- WICHTIG: Jetzt direkt hier am Feld! Das ist sicherer.
 
-    // --- WICHTIG: Hier das @JsonIgnore hin! ---
-    // Damit verhindern wir sicher, dass das riesige Bild in der Liste landet
-    @JsonIgnore
+    // Hier kein @JsonIgnore mehr nötig (steht ja jetzt oben am Feld)
     public byte[] getImageData() { return imageData; }
-
     public void setImageData(byte[] imageData) { this.imageData = imageData; }
 
-    // ... Restliche Getter/Setter (unverändert) ...
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public String getShelfLocation() { return shelfLocation; }

@@ -1,7 +1,6 @@
 package com.example.demo.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // Import prüfen
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
@@ -11,8 +10,12 @@ public class ShoeHistory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    // --- HIER IST DER FIX ---
+    // 1. fetch = FetchType.LAZY: Verhindert, dass die DB das riesige Bild lädt
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shoe_id")
+    // 2. @JsonIgnore am Feld: Verhindert, dass Jackson versucht es zu senden
+    @JsonIgnore
     private Shoe shoe;
 
     private String production;
@@ -30,13 +33,16 @@ public class ShoeHistory {
     // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    @JsonIgnore // <--- DAS IST ENTSCHEIDEND! Verhindert Endlosschleifen.
+
     public Shoe getShoe() { return shoe; }
     public void setShoe(Shoe shoe) { this.shoe = shoe; }
+
     public String getProduction() { return production; }
     public void setProduction(String production) { this.production = production; }
+
     public LocalDate getRentedAt() { return rentedAt; }
     public void setRentedAt(LocalDate rentedAt) { this.rentedAt = rentedAt; }
+
     public LocalDate getReturnedAt() { return returnedAt; }
     public void setReturnedAt(LocalDate returnedAt) { this.returnedAt = returnedAt; }
 }

@@ -53,7 +53,17 @@ public class ShoeController {
     // --- WICHTIG FÜR DAS HISTORY MODAL ---
     @GetMapping("/{id}/history")
     public List<ShoeHistory> getShoeHistory(@PathVariable Long id) {
-        return historyRepository.findByShoeIdOrderByRentedAtDesc(id);
+        // 1. Daten aus DB holen
+        List<ShoeHistory> history = historyRepository.findByShoeIdOrderByRentedAtDesc(id);
+
+        // 2. NOTBREMSE: Wir setzen den Schuh in jedem Eintrag manuell auf NULL.
+        // Das verhindert GARANTIERT, dass das Bild geladen oder gesendet wird.
+        // Da wir nur die Liste zurückgeben und nicht speichern, ist das sicher.
+        for (ShoeHistory entry : history) {
+            entry.setShoe(null);
+        }
+
+        return history;
     }
 
     @PutMapping("/{id}")
