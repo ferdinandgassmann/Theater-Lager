@@ -13,7 +13,6 @@ public class ShoeHistory {
 
     @ManyToOne
     @JoinColumn(name = "shoe_id")
-    @JsonIgnore // <--- DAS IST ENTSCHEIDEND! Verhindert Endlosschleifen.
     private Shoe shoe;
 
     private String production;
@@ -31,6 +30,7 @@ public class ShoeHistory {
     // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    @JsonIgnore // <--- DAS IST ENTSCHEIDEND! Verhindert Endlosschleifen.
     public Shoe getShoe() { return shoe; }
     public void setShoe(Shoe shoe) { this.shoe = shoe; }
     public String getProduction() { return production; }
