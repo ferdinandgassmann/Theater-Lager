@@ -7,6 +7,7 @@ function EditShoeModal({ shoe, shoeTypes, onClose, onUpdate }) {
         shelfLocation: shoe.shelfLocation || '',
         type: shoe.type || '',
         size: shoe.size || '',
+        description: shoe.description || '', // NEU: Beschreibung
         image: null
     });
     const [loading, setLoading] = useState(false);
@@ -19,12 +20,11 @@ function EditShoeModal({ shoe, shoeTypes, onClose, onUpdate }) {
 
         try {
             // 1. Textdaten aktualisieren
-            // Wir müssen den aktuellen Status mitsenden, sonst setzt das Backend ihn zurück
             const payload = {
                 ...formData,
                 status: shoe.status,
                 currentProduction: shoe.currentProduction,
-                inventoryNumber: shoe.inventoryNumber // behalten wir bei
+                inventoryNumber: shoe.inventoryNumber
             };
 
             const res = await axios.put(`${API_URL}/api/shoes/${shoe.id}`, payload, { auth });
@@ -38,12 +38,11 @@ function EditShoeModal({ shoe, shoeTypes, onClose, onUpdate }) {
                     headers: { 'Content-Type': 'multipart/form-data' },
                     auth
                 });
-                // Kleiner Hack: Wir hängen einen Zeitstempel an, damit der Browser das Bild neu lädt
                 updatedShoe.imageUpdate = Date.now();
             }
 
-            onUpdate(updatedShoe); // App.js Bescheid geben
-            onClose(); // Fenster schließen
+            onUpdate(updatedShoe);
+            onClose();
         } catch (err) {
             alert('Fehler beim Speichern: ' + err.message);
             setLoading(false);
@@ -66,19 +65,25 @@ function EditShoeModal({ shoe, shoeTypes, onClose, onUpdate }) {
                             required
                             value={formData.shelfLocation}
                             onChange={e => setFormData({...formData, shelfLocation: e.target.value})}
-                            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none font-bold"
+                            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none font-bold uppercase"
                         />
                     </div>
 
+                    {/* TYP IST JETZT FREI EINGEBBAR MIT VORSCHLÄGEN */}
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Typ</label>
-                        <select
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kategorie / Typ</label>
+                        <input
+                            list="edit-shoe-types-list"
+                            type="text"
+                            required
+                            placeholder="Wählen oder Tippen..."
                             value={formData.type}
                             onChange={e => setFormData({...formData, type: e.target.value})}
                             className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none"
-                        >
-                            {shoeTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
+                        />
+                        <datalist id="edit-shoe-types-list">
+                             {shoeTypes.map(t => <option key={t} value={t} />)}
+                        </datalist>
                     </div>
 
                     <div>
@@ -89,6 +94,17 @@ function EditShoeModal({ shoe, shoeTypes, onClose, onUpdate }) {
                             value={formData.size}
                             onChange={e => setFormData({...formData, size: e.target.value})}
                             className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none"
+                        />
+                    </div>
+
+                    {/* NEU: BESCHREIBUNG */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beschreibung / Notizen</label>
+                        <textarea
+                            rows="2"
+                            value={formData.description}
+                            onChange={e => setFormData({...formData, description: e.target.value})}
+                            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none text-sm"
                         />
                     </div>
 

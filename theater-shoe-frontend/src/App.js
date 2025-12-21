@@ -64,34 +64,36 @@ function App() {
   };
 
   // --- NEU: BACKUP / EXPORT FUNKTION ---
-  const handleExport = () => {
-    // CSV Header
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Regal/Kiste;Typ;Größe;Status;Aktuelle Produktion;Inventar-ID\n";
+ const handleExport = () => {
+     // CSV Header (Jetzt mit Beschreibung und Bild-Link)
+     let csvContent = "data:text/csv;charset=utf-8,";
+     csvContent += "Regal/Kiste;Typ;Größe;Status;Produktion;Beschreibung;Bild-Link\n";
 
-    // Daten Zeilen
-    shoes.forEach(shoe => {
-        const row = [
-            shoe.shelfLocation || "",
-            shoe.type,
-            shoe.size,
-            shoe.status,
-            shoe.currentProduction || "",
-            shoe.inventoryNumber || ""
-        ].join(";"); // Semikolon Trennung für Excel (deutsch)
-        csvContent += row + "\n";
-    });
+     // Daten Zeilen
+     shoes.forEach(shoe => {
+         const imageLink = `${API_URL}/api/shoes/${shoe.id}/image`;
+         const row = [
+             shoe.shelfLocation || "",
+             shoe.type,
+             shoe.size,
+             shoe.status,
+             shoe.currentProduction || "",
+             // Wichtig: Beschreibung in Anführungszeichen setzen, falls Kommas drin sind
+             `"${(shoe.description || "").replace(/"/g, '""')}"`,
+             imageLink
+         ].join(";");
+         csvContent += row + "\n";
+     });
 
-    // Download auslösen
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    const date = new Date().toISOString().slice(0,10);
-    link.setAttribute("download", `Lager_Backup_${date}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+     const encodedUri = encodeURI(csvContent);
+     const link = document.createElement("a");
+     link.setAttribute("href", encodedUri);
+     const date = new Date().toISOString().slice(0,10);
+     link.setAttribute("download", `Lager_Backup_${date}.csv`);
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+   };
 
   // --- STATISTIK ---
   const stats = {
@@ -285,22 +287,29 @@ function App() {
                       </div>
                   )}
                   {/* BILD BEREICH */}
-                  <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
-                      {shoe.imageUpdate || shoe.hasImage ? (
-                           <img
-                              src={`${API_URL}/api/shoes/${shoe.id}/image...`} // (dein bestehender Code)
-                              alt={shoe.type}
-                              className="w-full h-full object-cover"
-                              onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                           />
-                      ) : null}
+                                    <div className="h-40 w-full bg-blue-50 flex items-center justify-center overflow-hidden relative group-hover:bg-blue-100 transition-colors">
+                                        {(shoe.imageUpdate || shoe.hasImage) ? (
+                                             <img
+                                                // KORREKTUR: Keine Punkte am Ende und ?t=... für Cache-Reset angefügt
+                                                src={`${API_URL}/api/shoes/${shoe.id}/image${shoe.imageUpdate ? `?t=${shoe.imageUpdate}` : ''}`}
+                                                alt={shoe.type}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    // Wenn Bild nicht lädt: Bild ausblenden, Fallback einblenden
+                                                    e.target.style.display = 'none';
+                                                    // Sucht das nächste Element (den Fallback-Div) und zeigt ihn an
+                                                    e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                             />
+                                        ) : null}
 
-                      {/* Fallback, wenn kein Bild da ist (oder Error auftritt) */}
-                      <div className={`flex flex-col items-center justify-center text-blue-300 ${shoe.imageUpdate || shoe.hasImage ? 'hidden' : 'flex'}`}>
-                          <span className="text-4xl">👞</span>
-                          <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
-                      </div>
-                  </div>
+                                        {/* Fallback Icon */}
+                                        {/* Ist standardmäßig 'hidden', wenn ein Bild da sein sollte. onError schaltet es auf 'flex' */}
+                                        <div className={`w-full h-full flex flex-col items-center justify-center text-blue-300 absolute top-0 left-0 ${(shoe.imageUpdate || shoe.hasImage) ? 'hidden' : 'flex'}`}>
+                                            <span className="text-4xl">👞</span>
+                                            <span className="text-xs font-bold mt-1 uppercase tracking-widest opacity-50">Kein Foto</span>
+                                        </div>
+                                    </div>
                   <div className="p-3">
                     <h2 className="text-sm font-bold text-gray-800 truncate" title={shoe.type}>{shoe.type}</h2>
                     <p className="text-xs text-gray-500">Größe: <span className="font-bold text-gray-800">{shoe.size}</span></p>

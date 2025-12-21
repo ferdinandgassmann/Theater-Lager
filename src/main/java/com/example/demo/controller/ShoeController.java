@@ -74,7 +74,7 @@ public class ShoeController {
                 shoe.setReturnDate(shoeDetails.getReturnDate());
             }
             shoe.setShelfLocation(shoeDetails.getShelfLocation());
-
+            shoe.setDescription(shoeDetails.getDescription());
             shoe.setInventoryNumber(shoeDetails.getInventoryNumber());
             shoe.setType(shoeDetails.getType());
             shoe.setSize(shoeDetails.getSize());
@@ -87,6 +87,11 @@ public class ShoeController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteShoe(@PathVariable Long id) {
         return shoeRepository.findById(id).map(shoe -> {
+            // 1. Zuerst die Historie löschen (Fix für Fehler 500)
+            List<ShoeHistory> historyEntries = historyRepository.findByShoeIdOrderByRentedAtDesc(id);
+            historyRepository.deleteAll(historyEntries);
+
+            // 2. Dann den Schuh löschen
             shoeRepository.delete(shoe);
             return ResponseEntity.ok().build();
         }).orElse(ResponseEntity.notFound().build());
